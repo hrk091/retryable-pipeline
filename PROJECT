@@ -1,0 +1,16 @@
+domain: hrk091.dev
+layout:
+- go.kubebuilder.io/v3
+projectName: retryable-pipeline
+repo: github.com/hrk091/retryable-pipeline
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: hrk091.dev
+  group: tekton
+  kind: RetryablePipelineRun
+  path: github.com/hrk091/retryable-pipeline/api/v1alpha1
+  version: v1alpha1
+version: "3"

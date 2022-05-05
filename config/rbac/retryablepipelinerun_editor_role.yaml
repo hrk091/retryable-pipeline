@@ -1,0 +1,24 @@
+# permissions for end users to edit retryablepipelineruns.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: retryablepipelinerun-editor-role
+rules:
+- apiGroups:
+  - tekton.hrk091.dev
+  resources:
+  - retryablepipelineruns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - tekton.hrk091.dev
+  resources:
+  - retryablepipelineruns/status
+  verbs:
+  - get

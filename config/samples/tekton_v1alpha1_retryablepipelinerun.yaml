@@ -1,0 +1,6 @@
+apiVersion: tekton.hrk091.dev/v1alpha1
+kind: RetryablePipelineRun
+metadata:
+  name: retryablepipelinerun-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,20 @@
+# permissions for end users to view retryablepipelineruns.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: retryablepipelinerun-viewer-role
+rules:
+- apiGroups:
+  - tekton.hrk091.dev
+  resources:
+  - retryablepipelineruns
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - tekton.hrk091.dev
+  resources:
+  - retryablepipelineruns/status
+  verbs:
+  - get
