@@ -24,6 +24,11 @@ import (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:shortName="rpr"
+//+kubebuilder:printcolumn:name="SUCCEEDED",type="string",JSONPath=`.status.conditions[?(@.type=="Succeeded")].status`
+//+kubebuilder:printcolumn:name="REASON",type="string",JSONPath=`.status.conditions[?(@.type=="Succeeded")].reason`
+//+kubebuilder:printcolumn:name="STARTTIME",type="date",JSONPath=".status.startTime"
+//+kubebuilder:printcolumn:name="COMPLETIONTIME",type="date",JSONPath=".status.completionTime"
 
 // RetryablePipelineRun is the Schema for the retryablepipelineruns API
 type RetryablePipelineRun struct {
@@ -67,6 +72,12 @@ type RetryablePipelineRunStatus struct {
 	// CompletionTime is the time the RetryablePipelineRun completed.
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
+
+	// Conditions is the latest available observations of a resource's current state.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions duckv1beta1.Conditions `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// PipelineRuns is the map of PipelineRunTaskRunStatus with the taskRun name as the key.
 	// +optional
