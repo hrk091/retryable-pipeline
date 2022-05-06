@@ -18,7 +18,10 @@ package v1alpha1
 
 import (
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/pkg/names"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"knative.dev/pkg/apis"
 	duckv1beta1 "knative.dev/pkg/apis/duck/v1beta1"
 )
 
@@ -36,13 +39,13 @@ type RetryablePipelineRun struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// +optional
-	Spec RetryablePipelineRunSpec `json:"spec,omitempty"`
+	Spec *RetryablePipelineRunSpec `json:"spec,omitempty"`
 
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:validation:Type=object
 	// +optional
-	Status RetryablePipelineRunStatus `json:"status,omitempty"`
+	Status *RetryablePipelineRunStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -60,11 +63,13 @@ func init() {
 
 // RetryablePipelineRunSpec defines the desired state of RetryablePipelineRun
 type RetryablePipelineRunSpec struct {
-	pipelinev1beta1.PipelineRunSpec `json:"spec,inline"`
+	*pipelinev1beta1.PipelineRunSpec `json:",inline"`
 }
 
 // RetryablePipelineRunStatus defines the observed state of RetryablePipelineRun
 type RetryablePipelineRunStatus struct {
+	duckv1beta1.Status `json:",inline"`
+
 	// StartTime is the time the RetryablePipelineRun is actually started.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty"`
@@ -73,17 +78,11 @@ type RetryablePipelineRunStatus struct {
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 
-	// Conditions is the latest available observations of a resource's current state.
+	// PipelineRuns is the list of PipelineRun statuses with using its name as the merge key.
 	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	Conditions duckv1beta1.Conditions `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	PipelineRuns []*PartialPipelineRunStatusFields `json:"pipelineRuns,omitempty"`
 
-	// PipelineRuns is the map of PipelineRunTaskRunStatus with the taskRun name as the key.
-	// +optional
-	PipelineRuns map[string]*pipelinev1beta1.PipelineRunStatus `json:"pipelineRuns,omitempty"`
-
-	// PipelineResults is the list of results written out by the pipeline task's containers
+	// PipelineResults is the list of results written out by the pipeline task's containers.
 	// +optional
 	// +listType=atomic
 	PipelineResults []pipelinev1beta1.PipelineRunResult `json:"pipelineResults,omitempty"`
@@ -92,8 +91,11 @@ type RetryablePipelineRunStatus struct {
 	PinnedPipelineRun *pipelinev1beta1.PipelineRun `json:"pinnedPipelineRun,omitempty"`
 }
 
-// PartialPipelineRunStatusFields contain the fields of child PipelineRuns' status.
+// PartialPipelineRunStatusFields contains the fields of child PipelineRuns' status.
 type PartialPipelineRunStatusFields struct {
+	// Name is the name of PipelineRun as well as the primary key of PartialPipelineRunStatusFields collection.
+	Name string `json:"name"`
+
 	// StartTime is the time the PipelineRun is actually started.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty"`
@@ -113,8 +115,125 @@ type PartialPipelineRunStatusFields struct {
 	// +listType=atomic
 	SkippedTasks []pipelinev1beta1.SkippedTask `json:"skippedTasks,omitempty"`
 
-	// ChildReferences is the list of TaskRun and Run names, PipelineTask names, and API versions/kinds for children of this PipelineRun.
+	// TaskRuns is the map of PipelineRunTaskRunStatus with the taskRun name as the key.
 	// +optional
-	// +listType=atomic
-	ChildReferences []pipelinev1beta1.ChildStatusReference `json:"childReferences,omitempty"`
+	TaskRuns map[string]*pipelinev1beta1.PipelineRunTaskRunStatus `json:"taskRuns,omitempty"`
+}
+
+func (s *PartialPipelineRunStatusFields) SyncFrom(pr *pipelinev1beta1.PipelineRunStatus) {
+	s.StartTime = pr.StartTime
+	s.CompletionTime = pr.CompletionTime
+	s.Conditions = pr.Conditions
+	s.SkippedTasks = pr.SkippedTasks
+	s.TaskRuns = pr.TaskRuns
+}
+
+func (rpr *RetryablePipelineRun) ChildLabels() labels.Set {
+	return labels.Merge(rpr.Labels, map[string]string{LabelKeyRetryablePipelineRun: rpr.Name})
+}
+
+// InitializeStatus will set all conditions in condSet to unknown for the RetryablePipelineRun
+// and set the started time to the current time
+func (rpr *RetryablePipelineRun) InitializeStatus() {
+	justStarted := false
+	if rpr.Status == nil {
+		rpr.Status = &RetryablePipelineRunStatus{
+			PipelineRuns:    []*PartialPipelineRunStatusFields{},
+			PipelineResults: []pipelinev1beta1.PipelineRunResult{},
+		}
+		justStarted = true
+	}
+	if justStarted {
+		conditionManager := condSet.Manage(rpr.Status)
+		conditionManager.InitializeConditions()
+		initialCondition := conditionManager.GetCondition(apis.ConditionSucceeded)
+		initialCondition.Reason = pipelinev1beta1.PipelineRunReasonStarted.String()
+		conditionManager.SetCondition(*initialCondition)
+		rpr.Status.StartTime = &initialCondition.LastTransitionTime.Inner
+	}
+}
+
+var condSet = apis.NewBatchConditionSet()
+
+func (s *RetryablePipelineRunStatus) GetCondition(t apis.ConditionType) *apis.Condition {
+	return condSet.Manage(s).GetCondition(t)
+}
+
+// HasStarted returns whether RetryablePipelineRun has valid start time set in its status.
+func (rpr *RetryablePipelineRun) HasStarted() bool {
+	if rpr.Status == nil {
+		return false
+	}
+	return rpr.Status.StartTime != nil && !rpr.Status.StartTime.IsZero()
+}
+
+// HasSucceeded returns true if the RetryablePipelineRun has been succeeded.
+func (rpr *RetryablePipelineRun) HasSucceeded() bool {
+	return rpr.Status.GetCondition(apis.ConditionSucceeded).IsTrue()
+}
+
+// HasDone returns true if the RetryablePipelineRun has been succeeded/completed/failed.
+func (rpr *RetryablePipelineRun) HasDone() bool {
+	return !rpr.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
+}
+
+// HasCancelled returns true if the RetryablePipelineRun has been cancelled.
+func (rpr *RetryablePipelineRun) HasCancelled() bool {
+	return !rpr.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
+}
+
+func (rpr *RetryablePipelineRun) genPipelineRunName() string {
+	return names.SimpleNameGenerator.RestrictLengthWithRandomSuffix(rpr.Name)
+}
+
+func (rpr *RetryablePipelineRun) ReserveNextPipelineRunName() bool {
+	for _, pr := range rpr.Status.PipelineRuns {
+		if pr.StartTime == nil {
+			return false
+		}
+	}
+	rpr.Status.PipelineRuns = append(rpr.Status.PipelineRuns, &PartialPipelineRunStatusFields{
+		Name: rpr.genPipelineRunName(),
+	})
+	return true
+}
+
+func (rpr *RetryablePipelineRun) NextPipelineRunName() string {
+	for _, pr := range rpr.Status.PipelineRuns {
+		if pr.StartTime == nil {
+			return pr.Name
+		}
+	}
+	return ""
+}
+
+func (rpr *RetryablePipelineRun) StartedPipelineRunCount() int {
+	c := 0
+	for _, pr := range rpr.Status.PipelineRuns {
+		if pr.StartTime != nil {
+			c++
+		}
+	}
+	return c
+}
+
+func (rpr *RetryablePipelineRun) PipelineRunStatus(name string) *PartialPipelineRunStatusFields {
+	for _, pr := range rpr.Status.PipelineRuns {
+		if pr.Name == name {
+			return pr
+		}
+	}
+	return nil
+}
+
+func (rpr *RetryablePipelineRun) NewPipelineRun(name string, spec *pipelinev1beta1.PipelineRunSpec) *pipelinev1beta1.PipelineRun {
+	return &pipelinev1beta1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   rpr.Namespace,
+			Labels:      rpr.ChildLabels(),
+			Annotations: rpr.Annotations,
+		},
+		Spec: *spec,
+	}
 }
