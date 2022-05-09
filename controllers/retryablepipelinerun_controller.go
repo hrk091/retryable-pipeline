@@ -18,13 +18,13 @@ package controllers
 
 import (
 	"context"
-
+	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	tektonv1alpha1 "github.com/hrk091/retryable-pipeline/api/v1alpha1"
+	rprv1alpha1 "github.com/hrk091/retryable-pipeline/api/v1alpha1"
 )
 
 // RetryablePipelineRunReconciler reconciles a RetryablePipelineRun object
@@ -36,20 +36,74 @@ type RetryablePipelineRunReconciler struct {
 //+kubebuilder:rbac:groups=tekton.hrk091.dev,resources=retryablepipelineruns,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=tekton.hrk091.dev,resources=retryablepipelineruns/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=tekton.hrk091.dev,resources=retryablepipelineruns/finalizers,verbs=update
+//+kubebuilder:rbac:groups=tekton.dev,resources=pipelineruns,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=create;delete
+//+kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the RetryablePipelineRun object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	l := log.FromContext(ctx)
+	l.Info("start reconciliation")
 
-	// TODO(user): your logic here
+	var rpr rprv1alpha1.RetryablePipelineRun
+	if err := r.Get(ctx, req.NamespacedName, &rpr); err != nil {
+		l.Error(err, "unable to fetch RetryablePipelineRun")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !rpr.HasStarted() {
+		l.Info("initialization started")
+		rpr.InitializeStatus()
+		rpr.ReserveNextPipelineRunName()
+		if err := r.Status().Update(ctx, &rpr); err != nil {
+			l.Error(err, "unable to update RetryablePipelineRun Status")
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
+		l.Info("initialization completed. Requeueing...")
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// TODO check retry annotation and reserve PipelineRun name
+
+	l.Info("listing PipelineRun")
+	var prs pipelinev1beta1.PipelineRunList
+	if err := r.List(ctx, &prs, &client.ListOptions{
+		LabelSelector: rpr.ChildLabels().AsSelector(),
+		Namespace:     rpr.Namespace,
+	}); err != nil {
+		l.Error(err, "unable to list PipelineRun")
+		return ctrl.Result{}, err
+	}
+
+	l.Info("update RetryablePipelineRun status")
+	for _, pr := range prs.Items {
+		s := rpr.PipelineRunStatus(pr.Name)
+		if s == nil {
+			l.Info("not belonging PipelineRun found", "name", pr.Name)
+		}
+		s.SyncFrom(&pr.Status)
+	}
+
+	// TODO calculate aggregate status
+	if err := r.Status().Update(ctx, &rpr); err != nil {
+		l.Error(err, "unable to list RetryablePipelineRun Status")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+	l.Info("updated RetryablePipelineRun status")
+
+	name := rpr.NextPipelineRunName()
+	if name != "" {
+		l.Info("creating PipelineRun")
+		// TODO generate new spec for retry
+		pr := rpr.NewPipelineRun(name, rpr.Spec.PipelineRunSpec)
+
+		if err := r.createPipelineRun(ctx, pr, &rpr); err != nil {
+			l.Error(err, "unable to create PipelineRun")
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
+		l.Info("created pipeline")
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -57,6 +111,21 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *RetryablePipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&tektonv1alpha1.RetryablePipelineRun{}).
+		For(&rprv1alpha1.RetryablePipelineRun{}).
+		Owns(&pipelinev1beta1.PipelineRun{}).
 		Complete(r)
+}
+
+func (r *RetryablePipelineRunReconciler) createPipelineRun(ctx context.Context, pr *pipelinev1beta1.PipelineRun, rpr *rprv1alpha1.RetryablePipelineRun) error {
+	l := log.FromContext(ctx)
+	if err := ctrl.SetControllerReference(rpr, pr, r.Scheme); err != nil {
+		l.Error(err, "unable to set controller reference to PipelineRun")
+		return err
+	}
+	if err := r.Create(ctx, pr); err != nil {
+		l.Error(err, "unable to create PipelineRun")
+		return err
+	}
+	l.Info("created a PipelineRun")
+	return nil
 }

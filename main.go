@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -31,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	tektonv1alpha1 "github.com/hrk091/retryable-pipeline/api/v1alpha1"
+	rprv1alpha1 "github.com/hrk091/retryable-pipeline/api/v1alpha1"
 	"github.com/hrk091/retryable-pipeline/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -44,8 +45,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(tektonv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(rprv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+	utilruntime.Must(pipelinev1beta1.AddToScheme(scheme))
 }
 
 func main() {
