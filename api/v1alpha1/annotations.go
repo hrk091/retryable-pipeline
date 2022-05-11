@@ -22,8 +22,13 @@ import (
 
 var (
 	AnnKeyShowDebug = GroupVersion.Group + "/show-debug"
+	AnnKeyRetryKey  = GroupVersion.Group + "/retry-key"
 )
 
 func ShowDebug(m *metav1.ObjectMeta) bool {
 	return m.Annotations[AnnKeyShowDebug] != ""
+}
+
+func RetryKey(m *metav1.ObjectMeta) string {
+	return m.Annotations[AnnKeyRetryKey]
 }

@@ -69,7 +69,20 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// TODO check retry annotation and reserve PipelineRun name
+	if rpr.IsRetryKeyChanged() {
+		l.Info("retry setup started")
+		if rpr.ReserveNextPipelineRunName() {
+			rpr.CopyRetryKey()
+			if err := r.Status().Update(ctx, &rpr); err != nil {
+				l.Error(err, "unable to update RetryablePipelineRun Status")
+				return ctrl.Result{}, client.IgnoreNotFound(err)
+			}
+			l.Info("retry setup completed. Requeueing...")
+			return ctrl.Result{Requeue: true}, nil
+		} else {
+			l.Info("there is still running PipelineRun. retry skipped.")
+		}
+	}
 
 	l.Info("listing PipelineRun")
 	var prs pipelinev1beta1.PipelineRunList

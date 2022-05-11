@@ -51,6 +51,9 @@ type RetryablePipelineRunStatus struct {
 	// +optional
 	// +listType=atomic
 	PipelineResults []pipelinev1beta1.PipelineRunResult `json:"pipelineResults,omitempty"`
+
+	// RetryKey is the copy of retry-key annotation to compare with its previous value.
+	RetryKey string
 }
 
 // InitializeStatus initializes the RetryablePipelineRun status.
@@ -131,6 +134,14 @@ type PartialPipelineRunStatus struct {
 	// TaskRuns is the map of PipelineRunTaskRunStatus with the taskRun name as the key.
 	// +optional
 	TaskRuns map[string]*pipelinev1beta1.PipelineRunTaskRunStatus `json:"taskRuns,omitempty"`
+}
+
+func (rpr *RetryablePipelineRun) IsRetryKeyChanged() bool {
+	return RetryKey(&rpr.ObjectMeta) != rpr.Status.RetryKey
+}
+
+func (rpr *RetryablePipelineRun) CopyRetryKey() {
+	rpr.Status.RetryKey = RetryKey(&rpr.ObjectMeta)
 }
 
 func (s *PartialPipelineRunStatus) CopyFrom(pr *pipelinev1beta1.PipelineRunStatus) {
