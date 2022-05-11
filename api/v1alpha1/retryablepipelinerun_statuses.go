@@ -24,7 +24,7 @@ import (
 	duckv1beta1 "knative.dev/pkg/apis/duck/v1beta1"
 )
 
-// RetryablePipelineRunStatus defines the observed state of RetryablePipelineRun
+// RetryablePipelineRunStatus defines the observed state of RetryablePipelineRun.
 type RetryablePipelineRunStatus struct {
 	duckv1beta1.Status `json:",inline"`
 
@@ -64,6 +64,8 @@ func (rpr *RetryablePipelineRun) InitializeStatus() {
 	}
 }
 
+// AggregateChildrenResults aggregates belonging PipelineRun/TaskRun statuses
+// and populates RetryablePipelineRunStatus with their latest statuses.
 func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 	m := map[string]*CompletedTaskResults{}
 	for _, pr := range rpr.Status.PipelineRuns {

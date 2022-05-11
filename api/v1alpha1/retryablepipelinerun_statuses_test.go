@@ -25,7 +25,7 @@ import (
 	"time"
 )
 
-func TestReserveNextPipelineRunName(t *testing.T) {
+func TestRetryablePipelineRun_ReserveNextPipelineRunName(t *testing.T) {
 	b := []byte(`
 apiVersion: tekton.hrk091.dev/v1alpha1
 kind: RetryablePipelineRun

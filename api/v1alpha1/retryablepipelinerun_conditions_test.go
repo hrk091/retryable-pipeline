@@ -19,11 +19,14 @@ package v1alpha1_test
 import (
 	"github.com/hrk091/retryable-pipeline/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"knative.dev/pkg/apis"
 	"testing"
 )
 
-func TestConditions(t *testing.T) {
+func TestRetryablePipelineRunStatus_Conditions(t *testing.T) {
 
 	type condBools struct {
 		hasStarted   bool
@@ -178,4 +181,50 @@ status:
 			assert.Equal(t, tc.want.hasCancelled, o.HasCancelled())
 		})
 	}
+}
+
+func TestRetryablePipelineRunStatus_SetCondition(t *testing.T) {
+	r := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+	cond := apis.Condition{
+		Type:   apis.ConditionSucceeded,
+		Status: corev1.ConditionUnknown,
+		Reason: pipelinev1beta1.PipelineRunReasonRunning.String(),
+	}
+
+	r.Status.SetCondition(&cond)
+
+	act := r.Status.GetCondition()
+	assert.Equal(t, cond.Type, act.Type)
+	assert.Equal(t, cond.Status, act.Status)
+	assert.Equal(t, cond.Reason, act.Reason)
+}
+
+func TestRetryablePipelineRunStatus_MarkRunning(t *testing.T) {
+	r := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+
+	r.Status.MarkRunning(pipelinev1beta1.PipelineRunReasonRunning.String(), "some message")
+
+	assert.True(t, r.HasStarted())
+	assert.False(t, r.HasSucceeded())
+	assert.False(t, r.HasDone())
+}
+
+func TestRetryablePipelineRunStatus_MarkSucceeded(t *testing.T) {
+	r := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+
+	r.Status.MarkSucceeded(pipelinev1beta1.PipelineRunReasonSuccessful.String(), "some message")
+
+	assert.True(t, r.HasStarted())
+	assert.True(t, r.HasSucceeded())
+	assert.True(t, r.HasDone())
+}
+
+func TestRetryablePipelineRunStatus_MarkFailed(t *testing.T) {
+	r := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+
+	r.Status.MarkFailed(pipelinev1beta1.PipelineRunReasonFailed.String(), "some message")
+
+	assert.True(t, r.HasStarted())
+	assert.False(t, r.HasSucceeded())
+	assert.True(t, r.HasDone())
 }
