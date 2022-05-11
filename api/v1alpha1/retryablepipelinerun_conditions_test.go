@@ -19,10 +19,8 @@ package v1alpha1_test
 import (
 	"github.com/hrk091/retryable-pipeline/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"testing"
-	"time"
 )
 
 func TestConditions(t *testing.T) {
@@ -180,61 +178,4 @@ status:
 			assert.Equal(t, tc.want.hasCancelled, o.HasCancelled())
 		})
 	}
-}
-
-func TestReserveNextPipelineRunName(t *testing.T) {
-	b := []byte(`
-apiVersion: tekton.hrk091.dev/v1alpha1
-kind: RetryablePipelineRun
-metadata:
-  name: test
-status:
-  startTime: "2022-05-06T13:38:06Z"
-  conditions:
-    - reason: Started
-      status: Unknown
-      type: Succeeded
-`)
-	var o v1alpha1.RetryablePipelineRun
-	if err := yaml.Unmarshal(b, &o); err != nil {
-		panic(err)
-	}
-
-	// init state
-	assert.Empty(t, o.NextPipelineRunName())
-	assert.Equal(t, 0, o.StartedPipelineRunCount())
-
-	// first
-	ok := o.ReserveNextPipelineRunName()
-	assert.True(t, ok)
-	assert.NotEmpty(t, o.NextPipelineRunName())
-	assert.Equal(t, 0, o.StartedPipelineRunCount())
-
-	// first (repeat before PipelineRun creation)
-	ok = o.ReserveNextPipelineRunName()
-	assert.False(t, ok)
-	assert.NotEmpty(t, o.NextPipelineRunName())
-	assert.Equal(t, 0, o.StartedPipelineRunCount())
-
-	// first PipelineRun start
-	o.Status.PipelineRuns[0].StartTime = &metav1.Time{Time: time.Now()}
-	assert.Empty(t, o.NextPipelineRunName())
-	assert.Equal(t, 1, o.StartedPipelineRunCount())
-
-	// second
-	ok = o.ReserveNextPipelineRunName()
-	assert.True(t, ok)
-	assert.NotEmpty(t, o.NextPipelineRunName())
-	assert.Equal(t, 1, o.StartedPipelineRunCount())
-
-	// second (repeat before PipelineRun creation)
-	ok = o.ReserveNextPipelineRunName()
-	assert.False(t, ok)
-	assert.NotEmpty(t, o.NextPipelineRunName())
-	assert.Equal(t, 1, o.StartedPipelineRunCount())
-
-	// second PipelineRun start
-	o.Status.PipelineRuns[1].StartTime = &metav1.Time{Time: time.Now()}
-	assert.Empty(t, o.NextPipelineRunName())
-	assert.Equal(t, 2, o.StartedPipelineRunCount())
 }
