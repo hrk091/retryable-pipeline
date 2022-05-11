@@ -179,7 +179,8 @@ func (rpr *RetryablePipelineRun) HasDone() bool {
 
 // HasCancelled returns true if the RetryablePipelineRun has been cancelled.
 func (rpr *RetryablePipelineRun) HasCancelled() bool {
-	return !rpr.Status.GetCondition(apis.ConditionSucceeded).IsUnknown()
+	cond := rpr.Status.GetCondition(apis.ConditionSucceeded)
+	return cond.IsFalse() && cond.Reason == pipelinev1beta1.PipelineRunReasonCancelled.String()
 }
 
 func (rpr *RetryablePipelineRun) genPipelineRunName() string {
