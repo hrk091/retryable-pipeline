@@ -81,11 +81,12 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		s := rpr.PipelineRunStatus(pr.Name)
 		if s == nil {
 			l.Info("not belonging PipelineRun found", "name", pr.Name)
+			continue
 		}
-		s.SyncFrom(&pr.Status)
+		s.CopyFrom(&pr.Status)
 	}
+	rpr.AggregateChildrenResults()
 
-	// TODO calculate aggregate status
 	if err := r.Status().Update(ctx, &rpr); err != nil {
 		l.Error(err, "unable to list RetryablePipelineRun Status")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
