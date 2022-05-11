@@ -63,7 +63,7 @@ func (rpr *RetryablePipelineRun) InitializeStatus() {
 			PipelineRuns:    []*PartialPipelineRunStatus{},
 			PipelineResults: []pipelinev1beta1.PipelineRunResult{},
 		}
-		rpr.InitializeConditions()
+		rpr.Status.InitializeConditions()
 	}
 }
 

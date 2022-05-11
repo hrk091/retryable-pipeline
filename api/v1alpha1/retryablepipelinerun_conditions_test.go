@@ -175,10 +175,10 @@ status:
 				panic(err)
 			}
 
-			assert.Equal(t, tc.want.hasStarted, o.HasStarted())
-			assert.Equal(t, tc.want.hasSucceeded, o.HasSucceeded())
-			assert.Equal(t, tc.want.hasDone, o.HasDone())
-			assert.Equal(t, tc.want.hasCancelled, o.HasCancelled())
+			assert.Equal(t, tc.want.hasStarted, o.Status.HasStarted())
+			assert.Equal(t, tc.want.hasSucceeded, o.Status.HasSucceeded())
+			assert.Equal(t, tc.want.hasDone, o.Status.HasDone())
+			assert.Equal(t, tc.want.hasCancelled, o.Status.HasCancelled())
 		})
 	}
 }
@@ -204,9 +204,9 @@ func TestRetryablePipelineRunStatus_MarkRunning(t *testing.T) {
 
 	r.Status.MarkRunning(pipelinev1beta1.PipelineRunReasonRunning.String(), "some message")
 
-	assert.True(t, r.HasStarted())
-	assert.False(t, r.HasSucceeded())
-	assert.False(t, r.HasDone())
+	assert.True(t, r.Status.HasStarted())
+	assert.False(t, r.Status.HasSucceeded())
+	assert.False(t, r.Status.HasDone())
 }
 
 func TestRetryablePipelineRunStatus_MarkSucceeded(t *testing.T) {
@@ -214,9 +214,9 @@ func TestRetryablePipelineRunStatus_MarkSucceeded(t *testing.T) {
 
 	r.Status.MarkSucceeded(pipelinev1beta1.PipelineRunReasonSuccessful.String(), "some message")
 
-	assert.True(t, r.HasStarted())
-	assert.True(t, r.HasSucceeded())
-	assert.True(t, r.HasDone())
+	assert.True(t, r.Status.HasStarted())
+	assert.True(t, r.Status.HasSucceeded())
+	assert.True(t, r.Status.HasDone())
 }
 
 func TestRetryablePipelineRunStatus_MarkFailed(t *testing.T) {
@@ -224,7 +224,7 @@ func TestRetryablePipelineRunStatus_MarkFailed(t *testing.T) {
 
 	r.Status.MarkFailed(pipelinev1beta1.PipelineRunReasonFailed.String(), "some message")
 
-	assert.True(t, r.HasStarted())
-	assert.False(t, r.HasSucceeded())
-	assert.True(t, r.HasDone())
+	assert.True(t, r.Status.HasStarted())
+	assert.False(t, r.Status.HasSucceeded())
+	assert.True(t, r.Status.HasDone())
 }

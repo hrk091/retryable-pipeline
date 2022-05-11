@@ -25,41 +25,44 @@ var condSet = apis.NewBatchConditionSet()
 
 // InitializeConditions will set all conditions in condset to unknown for the RetryablePipelineRun
 // and set the started time to the current time.
-func (rpr *RetryablePipelineRun) InitializeConditions() {
-	conditionManager := condSet.Manage(rpr.Status)
+func (s *RetryablePipelineRunStatus) InitializeConditions() {
+	conditionManager := condSet.Manage(s)
 	conditionManager.InitializeConditions()
 	initialCondition := conditionManager.GetCondition(apis.ConditionSucceeded)
 	initialCondition.Reason = pipelinev1beta1.PipelineRunReasonStarted.String()
 	conditionManager.SetCondition(*initialCondition)
-	rpr.Status.StartTime = &initialCondition.LastTransitionTime.Inner
+	s.StartTime = &initialCondition.LastTransitionTime.Inner
 }
 
 // GetCondition returns the Condition of RetryablePipelineRun.
 func (s *RetryablePipelineRunStatus) GetCondition() *apis.Condition {
+	if s == nil {
+		return nil
+	}
 	return condSet.Manage(s).GetCondition(apis.ConditionSucceeded)
 }
 
 // HasStarted returns whether RetryablePipelineRun has valid start time set in its status.
-func (rpr *RetryablePipelineRun) HasStarted() bool {
-	if rpr.Status == nil {
+func (s *RetryablePipelineRunStatus) HasStarted() bool {
+	if s == nil {
 		return false
 	}
-	return rpr.Status.StartTime != nil && !rpr.Status.StartTime.IsZero()
+	return s.StartTime != nil && !s.StartTime.IsZero()
 }
 
 // HasSucceeded returns true if the RetryablePipelineRun has been succeeded.
-func (rpr *RetryablePipelineRun) HasSucceeded() bool {
-	return rpr.Status.GetCondition().IsTrue()
+func (s *RetryablePipelineRunStatus) HasSucceeded() bool {
+	return s.GetCondition().IsTrue()
 }
 
 // HasDone returns true if the RetryablePipelineRun has been succeeded/completed/failed.
-func (rpr *RetryablePipelineRun) HasDone() bool {
-	return !rpr.Status.GetCondition().IsUnknown()
+func (s *RetryablePipelineRunStatus) HasDone() bool {
+	return !s.GetCondition().IsUnknown()
 }
 
 // HasCancelled returns true if the RetryablePipelineRun has been cancelled.
-func (rpr *RetryablePipelineRun) HasCancelled() bool {
-	cond := rpr.Status.GetCondition()
+func (s *RetryablePipelineRunStatus) HasCancelled() bool {
+	cond := s.GetCondition()
 	return cond.IsFalse() && cond.Reason == pipelinev1beta1.PipelineRunReasonCancelled.String()
 }
 

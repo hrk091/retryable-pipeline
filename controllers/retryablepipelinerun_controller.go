@@ -52,12 +52,12 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if rpr.HasSucceeded() {
+	if rpr.Status.HasSucceeded() {
 		l.Info("already succeeded, nothing to do any more.")
 		return ctrl.Result{}, nil
 	}
 
-	if !rpr.HasStarted() {
+	if !rpr.Status.HasStarted() {
 		l.Info("initialization started")
 		rpr.InitializeStatus()
 		rpr.ReserveNextPipelineRunName()
