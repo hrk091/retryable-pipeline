@@ -187,6 +187,7 @@ func (rpr *RetryablePipelineRun) genPipelineRunName() string {
 	return names.SimpleNameGenerator.RestrictLengthWithRandomSuffix(rpr.Name)
 }
 
+// ReserveNextPipelineRunName reserves a name of PipelineRun to be created at the next reconcile loop.
 func (rpr *RetryablePipelineRun) ReserveNextPipelineRunName() bool {
 	for _, pr := range rpr.Status.PipelineRuns {
 		if pr.StartTime == nil {
@@ -199,6 +200,7 @@ func (rpr *RetryablePipelineRun) ReserveNextPipelineRunName() bool {
 	return true
 }
 
+// NextPipelineRunName returns a name of PipelineRun that should be used for the next PipelineRun.
 func (rpr *RetryablePipelineRun) NextPipelineRunName() string {
 	for _, pr := range rpr.Status.PipelineRuns {
 		if pr.StartTime == nil {
@@ -208,6 +210,7 @@ func (rpr *RetryablePipelineRun) NextPipelineRunName() string {
 	return ""
 }
 
+// StartedPipelineRunCount returns the number of child PipelineRuns already started.
 func (rpr *RetryablePipelineRun) StartedPipelineRunCount() int {
 	c := 0
 	for _, pr := range rpr.Status.PipelineRuns {
