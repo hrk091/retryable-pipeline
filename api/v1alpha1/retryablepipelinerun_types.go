@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/hrk091/retryable-pipeline/pkg/pipelinerun"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,13 +69,14 @@ func (rpr *RetryablePipelineRun) ChildLabels() labels.Set {
 }
 
 func (rpr *RetryablePipelineRun) NewPipelineRun(name string, spec *pipelinev1beta1.PipelineRunSpec) *pipelinev1beta1.PipelineRun {
-	return &pipelinev1beta1.PipelineRun{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   rpr.Namespace,
-			Labels:      rpr.ChildLabels(),
-			Annotations: rpr.Annotations,
-		},
-		Spec: *spec,
+	meta := metav1.ObjectMeta{
+		Name:        name,
+		Namespace:   rpr.Namespace,
+		Labels:      rpr.ChildLabels(),
+		Annotations: rpr.Annotations,
 	}
+	return pipelinerun.NewPipelineRun(
+		meta,
+		pipelinerun.AllSpec(spec),
+	)
 }
