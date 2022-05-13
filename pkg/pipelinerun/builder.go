@@ -18,6 +18,7 @@ package pipelinerun
 
 import (
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/tektoncd/pipeline/pkg/substitution"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -79,6 +80,13 @@ func ApplyResultsToPipelineTasks(refs ResolvedResultRefs) Transformer {
 	}
 }
 
+func ApplyResultsToPipelineResults(refs ResolvedResultRefs) Transformer {
+	return func(r *pipelinev1beta1.PipelineRun) {
+		stringReplacements := refs.getStringReplacements()
+		r.Spec.PipelineSpec.Results = replaceResultValues(r.Spec.PipelineSpec.Results, stringReplacements)
+	}
+}
+
 func SkipTask(pipelineTaskName string) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		for i, t := range r.Spec.PipelineSpec.Tasks {
@@ -106,4 +114,11 @@ func replaceParamValues(params []pipelinev1beta1.Param, stringReplacements map[s
 		params[i].Value.ApplyReplacements(stringReplacements, arrayReplacements)
 	}
 	return params
+}
+
+func replaceResultValues(results []pipelinev1beta1.PipelineResult, stringReplacements map[string]string) []pipelinev1beta1.PipelineResult {
+	for i := range results {
+		results[i].Value = substitution.ApplyReplacements(results[i].Value, stringReplacements)
+	}
+	return results
 }

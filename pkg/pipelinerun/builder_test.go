@@ -249,6 +249,53 @@ spec:
 	assert.Equal(t, want, pr)
 }
 
+func TestApplyResultsToPipelineResults(t *testing.T) {
+	want := expect([]byte(`
+metadata:
+  name: test
+  namespace: test-namespace
+spec:
+  pipelineSpec:
+    params:
+      - name: msg
+        type: string
+    results:
+      - description: test result
+        name: out
+        value: REPLACED
+    tasks:
+      - name: task1
+        params:
+          - name: msg
+            value: $(params.msg)
+        taskRef:
+          kind: Task
+          name: sample-echo
+      - name: task2
+        params:
+          - name: msg
+            value: $(tasks.task1.results.out)
+        runAfter:
+          - task1
+        taskRef:
+          kind: Task
+          name: sample-echo
+`))
+	p := internal.NewPipelineTestData("sample.pipeline")
+	refs := pipelinerun.ResolvedResultRefs{
+		&pipelinerun.ResolvedResultRef{
+			ResultReference: pipelinev1beta1.ResultRef{
+				PipelineTask: "task2",
+				Result:       "out",
+			},
+			Value:       *pipelinev1beta1.NewArrayOrString("REPLACED"),
+			FromTaskRun: "test-abcde-task1",
+		},
+	}
+	pr := pipelinerun.NewPipelineRun(testObjectMeta(), pipelinerun.PipelineSpec(&p.Spec), pipelinerun.ApplyResultsToPipelineResults(refs))
+	assert.Equal(t, want, pr)
+}
+
 func TestSkipTask(t *testing.T) {
 	want := expect([]byte(`
 metadata:
