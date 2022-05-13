@@ -81,10 +81,11 @@ func ApplyResultsToPipelineTasks(refs ResolvedResultRefs) Transformer {
 
 func SkipTask(pipelineTaskName string) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
-		for _, t := range r.Spec.PipelineSpec.Tasks {
+		for i, t := range r.Spec.PipelineSpec.Tasks {
 			if t.Name == pipelineTaskName {
 				t.WhenExpressions = SkipWhenExpression()
 			}
+			r.Spec.PipelineSpec.Tasks[i] = t
 		}
 	}
 }
