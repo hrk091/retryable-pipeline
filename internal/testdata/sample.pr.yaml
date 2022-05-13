@@ -1,0 +1,138 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  labels:
+    tekton.dev/pipeline: sample
+    tekton.hrk091.dev/retryablePipelineRun: sample-dh5hp
+  name: sample-dh5hp-d5v22
+  ownerReferences:
+    - apiVersion: tekton.hrk091.dev/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: RetryablePipelineRun
+      name: sample-dh5hp
+spec:
+  params:
+    - name: msg
+      value: aaa
+  pipelineRef:
+    name: sample
+  serviceAccountName: default
+  timeout: 1h0m0s
+status:
+  completionTime: "2022-05-06T13:38:29Z"
+  conditions:
+    - lastTransitionTime: "2022-05-06T13:38:29Z"
+      message: 'Tasks Completed: 2 (Failed: 0, Cancelled 0), Skipped: 0'
+      reason: Succeeded
+      status: "True"
+      type: Succeeded
+  pipelineResults:
+    - name: out
+      value: aaa
+  pipelineSpec:
+    params:
+      - name: msg
+        type: string
+    results:
+      - description: test result
+        name: out
+        value: $(tasks.task2.results.out)
+    tasks:
+      - name: task1
+        taskRef:
+          kind: Task
+          name: sample-echo
+      - name: task2
+        params:
+          - name: msg
+            value: $(params.msg)
+        runAfter:
+          - task1
+        taskRef:
+          kind: Task
+          name: sample-echo
+  startTime: "2022-05-06T13:38:06Z"
+  taskRuns:
+    sample-dh5hp-d5v22-task1:
+      pipelineTaskName: task1
+      status:
+        completionTime: "2022-05-06T13:38:22Z"
+        conditions:
+          - lastTransitionTime: "2022-05-06T13:38:22Z"
+            message: All Steps have completed executing
+            reason: Succeeded
+            status: "True"
+            type: Succeeded
+        podName: sample-dh5hp-d5v22-task1-pod
+        startTime: "2022-05-06T13:38:06Z"
+        steps:
+          - container: step-step1
+            imageID: docker.io/library/bash@sha256:...
+            name: step1
+            terminated:
+              containerID: containerd://...
+              exitCode: 0
+              finishedAt: "2022-05-06T13:38:22Z"
+              message: '[{"key":"out","value":"Hello world!","type":1}]'
+              reason: Completed
+              startedAt: "2022-05-06T13:38:22Z"
+        taskResults:
+          - name: out
+            value: Hello world!
+        taskSpec:
+          params:
+            - default: Hello world!
+              name: msg
+              type: string
+          results:
+            - description: test result
+              name: out
+          steps:
+            - image: bash:latest
+              name: step1
+              resources: {}
+              script: |
+                #!/usr/bin/env bash
+                echo -n '$(params.msg)' | tee $(results.out.path)
+    sample-dh5hp-d5v22-task2:
+      pipelineTaskName: task2
+      status:
+        completionTime: "2022-05-06T13:38:29Z"
+        conditions:
+          - lastTransitionTime: "2022-05-06T13:38:29Z"
+            message: All Steps have completed executing
+            reason: Succeeded
+            status: "True"
+            type: Succeeded
+        podName: sample-dh5hp-d5v22-task2-pod
+        startTime: "2022-05-06T13:38:22Z"
+        steps:
+          - container: step-step1
+            imageID: docker.io/library/bash@sha256:...
+            name: step1
+            terminated:
+              containerID: containerd://...
+              exitCode: 0
+              finishedAt: "2022-05-06T13:38:29Z"
+              message: '[{"key":"out","value":"aaa","type":1}]'
+              reason: Completed
+              startedAt: "2022-05-06T13:38:29Z"
+        taskResults:
+          - name: out
+            value: aaa
+        taskSpec:
+          params:
+            - default: Hello world!
+              name: msg
+              type: string
+          results:
+            - description: test result
+              name: out
+          steps:
+            - image: bash:latest
+              name: step1
+              resources: {}
+              script: |
+                #!/usr/bin/env bash
+                echo -n '$(params.msg)' | tee $(results.out.path)

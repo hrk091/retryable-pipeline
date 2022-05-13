@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: sample
+spec:
+  params:
+    - name: msg
+      type: string
+  results:
+    - description: test result
+      name: out
+      value: $(tasks.task2.results.out)
+  tasks:
+    - name: task1
+      params:
+        - name: msg
+          value: $(params.msg)
+      taskRef:
+        kind: Task
+        name: sample-echo
+    - name: task2
+      params:
+        - name: msg
+          value: $(tasks.task1.results.out)
+      runAfter:
+        - task1
+      taskRef:
+        kind: Task
+        name: sample-echo
+

@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sample-echo
+spec:
+  params:
+    - default: Hello world!
+      name: msg
+      type: string
+  results:
+    - description: test result
+      name: out
+  steps:
+    - image: bash:latest
+      name: step1
+      script: |
+        #!/usr/bin/env bash
+        echo -n '$(params.msg)' | tee $(results.out.path)

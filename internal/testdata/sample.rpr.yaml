@@ -1,0 +1,110 @@
+apiVersion: tekton.hrk091.dev/v1alpha1
+kind: RetryablePipelineRun
+metadata:
+  name: sample-dh5hp
+spec:
+  params:
+    - name: msg
+      value: aaa
+  pipelineRef:
+    name: sample
+status:
+  conditions:
+    - lastTransitionTime: "2022-05-06T13:38:06Z"
+      reason: Started
+      status: Unknown
+      type: Succeeded
+  pipelineRuns:
+    - completionTime: "2022-05-06T13:38:29Z"
+      conditions:
+        - lastTransitionTime: "2022-05-06T13:38:29Z"
+          message: 'Tasks Completed: 2 (Failed: 0, Cancelled 0), Skipped: 0'
+          reason: Succeeded
+          status: "True"
+          type: Succeeded
+      name: sample-dh5hp-d5v22
+      startTime: "2022-05-06T13:38:06Z"
+      taskRuns:
+        sample-dh5hp-d5v22-task1:
+          pipelineTaskName: task1
+          status:
+            completionTime: "2022-05-06T13:38:22Z"
+            conditions:
+              - lastTransitionTime: "2022-05-06T13:38:22Z"
+                message: All Steps have completed executing
+                reason: Succeeded
+                status: "True"
+                type: Succeeded
+            podName: sample-dh5hp-d5v22-task1-pod
+            startTime: "2022-05-06T13:38:06Z"
+            steps:
+              - container: step-step1
+                imageID: docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5
+                name: step1
+                terminated:
+                  containerID: containerd://3031a21a67ad1f666f9133288cc779a359b06b6659bfd2b62c5fc0b935971418
+                  exitCode: 0
+                  finishedAt: "2022-05-06T13:38:22Z"
+                  message: '[{"key":"out","value":"Hello world!","type":1}]'
+                  reason: Completed
+                  startedAt: "2022-05-06T13:38:22Z"
+            taskResults:
+              - name: out
+                value: Hello world!
+            taskSpec:
+              params:
+                - default: Hello world!
+                  name: msg
+                  type: string
+              results:
+                - description: test result
+                  name: out
+              steps:
+                - image: bash:latest
+                  name: step1
+                  resources: {}
+                  script: |
+                    #!/usr/bin/env bash
+                    echo -n '$(params.msg)' | tee $(results.out.path)
+        sample-dh5hp-d5v22-task2:
+          pipelineTaskName: task2
+          status:
+            completionTime: "2022-05-06T13:38:29Z"
+            conditions:
+              - lastTransitionTime: "2022-05-06T13:38:29Z"
+                message: All Steps have completed executing
+                reason: Succeeded
+                status: "True"
+                type: Succeeded
+            podName: sample-dh5hp-d5v22-task2-pod
+            startTime: "2022-05-06T13:38:22Z"
+            steps:
+              - container: step-step1
+                imageID: docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5
+                name: step1
+                terminated:
+                  containerID: containerd://de4f316bc8fa8b7044bd7cb206bfc960474fb3ca8812555e92037b521b791d5e
+                  exitCode: 0
+                  finishedAt: "2022-05-06T13:38:29Z"
+                  message: '[{"key":"out","value":"aaa","type":1}]'
+                  reason: Completed
+                  startedAt: "2022-05-06T13:38:29Z"
+            taskResults:
+              - name: out
+                value: aaa
+            taskSpec:
+              params:
+                - default: Hello world!
+                  name: msg
+                  type: string
+              results:
+                - description: test result
+                  name: out
+              steps:
+                - image: bash:latest
+                  name: step1
+                  resources: {}
+                  script: |
+                    #!/usr/bin/env bash
+                    echo -n '$(params.msg)' | tee $(results.out.path)
+  startTime: "2022-05-06T13:38:06Z"

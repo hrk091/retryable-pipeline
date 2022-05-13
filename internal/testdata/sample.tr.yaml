@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: tekton-pipelines
+    tekton.dev/memberOf: tasks
+    tekton.dev/pipeline: sample
+    tekton.dev/pipelineRun: sample-dh5hp-d5v22
+    tekton.dev/pipelineTask: task1
+    tekton.dev/task: sample-echo
+    tekton.hrk091.dev/retryablePipelineRun: sample-dh5hp
+  name: sample-dh5hp-d5v22-task1
+  ownerReferences:
+    - apiVersion: tekton.dev/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: PipelineRun
+      name: sample-dh5hp-d5v22
+spec:
+  serviceAccountName: default
+  taskRef:
+    kind: Task
+    name: sample-echo
+  timeout: 59m59.983091405s
+status:
+  completionTime: "2022-05-06T13:38:22Z"
+  conditions:
+    - lastTransitionTime: "2022-05-06T13:38:22Z"
+      message: All Steps have completed executing
+      reason: Succeeded
+      status: "True"
+      type: Succeeded
+  podName: sample-dh5hp-d5v22-task1-pod
+  startTime: "2022-05-06T13:38:06Z"
+  steps:
+    - container: step-step1
+      imageID: docker.io/library/bash@sha256:...
+      name: step1
+      terminated:
+        containerID: containerd://...
+        exitCode: 0
+        finishedAt: "2022-05-06T13:38:22Z"
+        message: '[{"key":"out","value":"Hello world!","type":1}]'
+        reason: Completed
+        startedAt: "2022-05-06T13:38:22Z"
+  taskResults:
+    - name: out
+      value: Hello world!
+  taskSpec:
+    params:
+      - default: Hello world!
+        name: msg
+        type: string
+    results:
+      - description: test result
+        name: out
+    steps:
+      - image: bash:latest
+        name: step1
+        resources: {}
+        script: |
+          #!/usr/bin/env bash
+          echo -n '$(params.msg)' | tee $(results.out.path)
