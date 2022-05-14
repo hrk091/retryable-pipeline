@@ -3,4 +3,57 @@ kind: RetryablePipelineRun
 metadata:
   name: retryablepipelinerun-sample
 spec:
-  # TODO(user): Add fields here
+  params:
+    - name: msg
+      value: Hello Tekton!
+  pipelineRef:
+    name: sample
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: sample
+spec:
+  params:
+    - name: msg
+      type: string
+  results:
+    - description: test result
+      name: out
+      value: $(tasks.task2.results.out)
+  tasks:
+    - name: task1
+      params:
+        - name: msg
+          value: $(params.msg)
+      taskRef:
+        kind: Task
+        name: sample-echo
+    - name: task2
+      params:
+        - name: msg
+          value: $(tasks.task1.results.out)
+      runAfter:
+        - task1
+      taskRef:
+        kind: Task
+        name: sample-echo
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sample-echo
+spec:
+  params:
+    - default: Hello world!
+      name: msg
+      type: string
+  results:
+    - description: test result
+      name: out
+  steps:
+    - image: bash:latest
+      name: step1
+      script: |
+        #!/usr/bin/env bash
+        echo -n '$(params.msg)' | tee $(results.out.path)
