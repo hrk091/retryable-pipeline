@@ -96,7 +96,7 @@ func (rpr *RetryablePipelineRun) PinPipelineRun(pr *pipelinev1beta1.PipelineRun)
 func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 	m := map[string]*CompletedTaskResults{}
 	for _, pr := range rpr.Status.PipelineRuns {
-		for _, tr := range pr.TaskRuns {
+		for trName, tr := range pr.TaskRuns {
 			if !tr.Status.GetCondition(apis.ConditionSucceeded).IsTrue() {
 				continue
 			}
@@ -105,6 +105,7 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 			}
 			m[tr.PipelineTaskName] = &CompletedTaskResults{
 				FromPipelineRun: pr.Name,
+				FromTaskRun:     trName,
 				Results:         tr.Status.TaskRunResults,
 			}
 		}
@@ -113,6 +114,7 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 
 	lastPr := rpr.Status.PipelineRuns[len(rpr.Status.PipelineRuns)-1]
 	lastCond := lastPr.GetCondition()
+	// TODO create original condition instead of copying
 	rpr.Status.SetCondition(lastCond.DeepCopy())
 	if lastCond.IsTrue() {
 		rpr.Status.PipelineResults = lastPr.PipelineResults

@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"testing"
 )
 
@@ -33,16 +32,8 @@ func testObjectMeta() metav1.ObjectMeta {
 	}
 }
 
-func expect(b []byte) *pipelinev1beta1.PipelineRun {
-	var want pipelinev1beta1.PipelineRun
-	if err := yaml.Unmarshal(b, &want); err != nil {
-		panic(err)
-	}
-	return &want
-}
-
 func TestNewPipelineRun(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -51,7 +42,7 @@ metadata:
 }
 
 func TestAllSpec(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -70,7 +61,7 @@ spec:
 }
 
 func TestPipelineSpec(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -107,7 +98,7 @@ spec:
 }
 
 func TestRemovePipelineRef(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -130,7 +121,7 @@ spec:
 }
 
 func TestApplyResultsToPipelineTasks(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -190,7 +181,7 @@ spec:
 }
 
 func TestApplyResultsToPipelineTask(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -250,7 +241,7 @@ spec:
 }
 
 func TestApplyResultsToPipelineResults(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
@@ -297,7 +288,7 @@ spec:
 }
 
 func TestSkipTask(t *testing.T) {
-	want := expect([]byte(`
+	want := internal.DecodePR([]byte(`
 metadata:
   name: test
   namespace: test-namespace
