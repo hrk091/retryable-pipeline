@@ -68,7 +68,8 @@ func (rpr *RetryablePipelineRun) ChildLabels() labels.Set {
 	return labels.Merge(rpr.Labels, map[string]string{LabelKeyRetryablePipelineRun: rpr.Name})
 }
 
-func (rpr *RetryablePipelineRun) NewPipelineRun(name string, spec *pipelinev1beta1.PipelineRunSpec) *pipelinev1beta1.PipelineRun {
+// NewPipelineRun returns a new PipelineRun with using given spec as RetryablePipelineRunSpec.
+func (rpr *RetryablePipelineRun) NewPipelineRun(name string) *pipelinev1beta1.PipelineRun {
 	meta := metav1.ObjectMeta{
 		Name:        name,
 		Namespace:   rpr.Namespace,
@@ -77,6 +78,31 @@ func (rpr *RetryablePipelineRun) NewPipelineRun(name string, spec *pipelinev1bet
 	}
 	return pipelinerun.NewPipelineRun(
 		meta,
-		pipelinerun.AllSpec(spec),
+		pipelinerun.Spec(rpr.Spec.PipelineRunSpec),
+	)
+}
+
+// NewRetryPipelineRun returns a new PipelineRun with using pinned PipelineRun Spec, applying results replacement
+// and skipping already completed PipelineTasks.
+func (rpr *RetryablePipelineRun) NewRetryPipelineRun(name string) *pipelinev1beta1.PipelineRun {
+	p := rpr.Status.PinnedPipelineRun
+	meta := p.ObjectMeta
+	meta.Name = name
+
+	resultRefs := rpr.Status.ResolvedResultRefs()
+	transformers := []pipelinerun.Transformer{
+		pipelinerun.Spec(&p.Spec),
+		pipelinerun.PipelineSpec(p.Status.PipelineSpec),
+		pipelinerun.RemovePipelineRef(),
+		pipelinerun.ApplyResultsToPipelineTasks(resultRefs),
+		pipelinerun.ApplyResultsToPipelineResults(resultRefs),
+	}
+	for ptName, _ := range rpr.Status.TaskResults {
+		transformers = append(transformers, pipelinerun.SkipTask(ptName))
+	}
+
+	return pipelinerun.NewPipelineRun(
+		meta,
+		transformers...,
 	)
 }

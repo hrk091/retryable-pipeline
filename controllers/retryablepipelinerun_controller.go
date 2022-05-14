@@ -94,6 +94,12 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 
+	l.Info("pin first PipelineRun")
+	if rpr.Status.PinnedPipelineRun == nil && len(prs.Items) > 0 {
+		rpr.PinPipelineRun(&prs.Items[0])
+		l.Info("pinned first PipelineRun")
+	}
+
 	l.Info("update RetryablePipelineRun status")
 	for _, pr := range prs.Items {
 		s := rpr.PipelineRunStatus(pr.Name)
@@ -106,22 +112,18 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 	rpr.AggregateChildrenResults()
 
 	if err := r.Status().Update(ctx, &rpr); err != nil {
-		l.Error(err, "unable to list RetryablePipelineRun Status")
+		l.Error(err, "unable to update RetryablePipelineRun Status")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	l.Info("updated RetryablePipelineRun status")
 
-	name := rpr.NextPipelineRunName()
-	if name != "" {
-		l.Info("creating PipelineRun")
-		// TODO generate new spec for retry
-		pr := rpr.NewPipelineRun(name, rpr.Spec.PipelineRunSpec)
-
+	if pr := r.makeNextPipelineRunIfRequested(&rpr); pr != nil {
+		l.Info("creating new PipelineRun", "PipelineRun", pr)
 		if err := r.createPipelineRun(ctx, pr, &rpr); err != nil {
 			l.Error(err, "unable to create PipelineRun")
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		l.Info("created pipeline")
+		l.Info("created new pipeline")
 	}
 
 	return ctrl.Result{}, nil
@@ -133,6 +135,18 @@ func (r *RetryablePipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) erro
 		For(&rprv1alpha1.RetryablePipelineRun{}).
 		Owns(&pipelinev1beta1.PipelineRun{}).
 		Complete(r)
+}
+
+func (r *RetryablePipelineRunReconciler) makeNextPipelineRunIfRequested(rpr *rprv1alpha1.RetryablePipelineRun) *pipelinev1beta1.PipelineRun {
+	name := rpr.NextPipelineRunName()
+	if name == "" {
+		return nil
+	}
+	if rpr.StartedPipelineRunCount() == 0 {
+		return rpr.NewPipelineRun(name)
+	} else {
+		return rpr.NewRetryPipelineRun(name)
+	}
 }
 
 func (r *RetryablePipelineRunReconciler) createPipelineRun(ctx context.Context, pr *pipelinev1beta1.PipelineRun, rpr *rprv1alpha1.RetryablePipelineRun) error {

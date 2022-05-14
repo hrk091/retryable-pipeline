@@ -68,6 +68,27 @@ func (rpr *RetryablePipelineRun) InitializeStatus() {
 	}
 }
 
+func (rpr *RetryablePipelineRun) PinPipelineRun(pr *pipelinev1beta1.PipelineRun) bool {
+	if pr.Status.PipelineSpec == nil {
+		return false
+	}
+	ppr := pr.DeepCopy()
+	ppr.ObjectMeta = metav1.ObjectMeta{
+		Namespace:   pr.Namespace,
+		Labels:      pr.Labels,
+		Annotations: pr.Annotations,
+	}
+	delete(ppr.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
+	ppr.Status = pipelinev1beta1.PipelineRunStatus{
+		PipelineRunStatusFields: pipelinev1beta1.PipelineRunStatusFields{
+			PipelineSpec: pr.Status.PipelineSpec,
+		},
+	}
+
+	rpr.Status.PinnedPipelineRun = ppr
+	return true
+}
+
 // AggregateChildrenResults aggregates belonging PipelineRun/TaskRun statuses
 // and populates RetryablePipelineRunStatus with their latest statuses.
 func (rpr *RetryablePipelineRun) AggregateChildrenResults() {

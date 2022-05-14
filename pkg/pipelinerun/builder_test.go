@@ -65,7 +65,7 @@ spec:
 			Name: "sample-pipeline",
 		},
 	}
-	pr := pipelinerun.NewPipelineRun(testObjectMeta(), pipelinerun.AllSpec(&runSpec))
+	pr := pipelinerun.NewPipelineRun(testObjectMeta(), pipelinerun.Spec(&runSpec))
 	assert.Equal(t, want, pr)
 }
 
@@ -125,7 +125,7 @@ spec:
 			Name: "sample-pipeline",
 		},
 	}
-	pr := pipelinerun.NewPipelineRun(testObjectMeta(), pipelinerun.AllSpec(&runSpec), pipelinerun.RemovePipelineRef())
+	pr := pipelinerun.NewPipelineRun(testObjectMeta(), pipelinerun.Spec(&runSpec), pipelinerun.RemovePipelineRef())
 	assert.Equal(t, want, pr)
 }
 

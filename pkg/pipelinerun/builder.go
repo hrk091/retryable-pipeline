@@ -34,9 +34,9 @@ func NewPipelineRun(m metav1.ObjectMeta, transformers ...Transformer) *pipelinev
 	return pr
 }
 
-func AllSpec(spec *pipelinev1beta1.PipelineRunSpec) Transformer {
+func Spec(spec *pipelinev1beta1.PipelineRunSpec) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
-		r.Spec = *spec
+		r.Spec = *spec.DeepCopy()
 	}
 }
 
@@ -48,7 +48,7 @@ func RemovePipelineRef() Transformer {
 
 func PipelineSpec(spec *pipelinev1beta1.PipelineSpec) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
-		r.Spec.PipelineSpec = spec
+		r.Spec.PipelineSpec = spec.DeepCopy()
 	}
 }
 
