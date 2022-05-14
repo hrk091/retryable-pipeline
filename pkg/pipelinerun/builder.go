@@ -24,6 +24,7 @@ import (
 
 type Transformer func(r *pipelinev1beta1.PipelineRun)
 
+// NewPipelineRun returns a new PipelineRun with applying one or more transformers.
 func NewPipelineRun(m metav1.ObjectMeta, transformers ...Transformer) *pipelinev1beta1.PipelineRun {
 	pr := &pipelinev1beta1.PipelineRun{
 		ObjectMeta: m,
@@ -34,24 +35,29 @@ func NewPipelineRun(m metav1.ObjectMeta, transformers ...Transformer) *pipelinev
 	return pr
 }
 
+// Spec returns a Transformer func to add a given PipelineRunSpec to PipelineRun.
 func Spec(spec *pipelinev1beta1.PipelineRunSpec) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		r.Spec = *spec.DeepCopy()
 	}
 }
 
+// RemovePipelineRef returns a Transformer func to remove PipelineRef.
 func RemovePipelineRef() Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		r.Spec.PipelineRef = nil
 	}
 }
 
+// PipelineSpec returns a Transformer func to add a given PipelineSpec to PipelineRun.
 func PipelineSpec(spec *pipelinev1beta1.PipelineSpec) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		r.Spec.PipelineSpec = spec.DeepCopy()
 	}
 }
 
+// ApplyResultsToPipelineTask returns a Transformer func to apply variable substitution for given PipelineTask
+// using already completed task results.
 func ApplyResultsToPipelineTask(pipelineTaskName string, refs ResolvedResultRefs) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		stringReplacements := refs.getStringReplacements()
@@ -67,6 +73,8 @@ func ApplyResultsToPipelineTask(pipelineTaskName string, refs ResolvedResultRefs
 	}
 }
 
+// ApplyResultsToPipelineTasks returns a Transformer func to apply variable substitution for all PipelineTasks
+// using already completed task results.
 func ApplyResultsToPipelineTasks(refs ResolvedResultRefs) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		stringReplacements := refs.getStringReplacements()
@@ -80,6 +88,8 @@ func ApplyResultsToPipelineTasks(refs ResolvedResultRefs) Transformer {
 	}
 }
 
+// ApplyResultsToPipelineResults returns a Transformer func to apply variable substitution for pipeline results
+// using already completed task results.
 func ApplyResultsToPipelineResults(refs ResolvedResultRefs) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		stringReplacements := refs.getStringReplacements()
@@ -87,6 +97,8 @@ func ApplyResultsToPipelineResults(refs ResolvedResultRefs) Transformer {
 	}
 }
 
+// SkipTask returns a Transformer func to add WhenExpression which is always evaluated as false
+// to a given PipelineTask to skip it.
 func SkipTask(pipelineTaskName string) Transformer {
 	return func(r *pipelinev1beta1.PipelineRun) {
 		for i, t := range r.Spec.PipelineSpec.Tasks {
@@ -98,7 +110,7 @@ func SkipTask(pipelineTaskName string) Transformer {
 	}
 }
 
-// SkipWhenExpression creates v1beta1.WhenExpression which is always handled as skipped.
+// SkipWhenExpression creates v1beta1.WhenExpression which is always evaluated as false to skip tasks it is attached.
 func SkipWhenExpression() pipelinev1beta1.WhenExpressions {
 	return pipelinev1beta1.WhenExpressions{
 		{

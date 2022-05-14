@@ -68,6 +68,8 @@ func (rpr *RetryablePipelineRun) InitializeStatus() {
 	}
 }
 
+// PinPipelineRun copies resolved PipelineSpec and metadata to RetryablePipelineRunStatus.PinnedPipelineRun
+// to pin spec and metadata of the first PipelineRun and enable to reuse them for building retry PipelineRun.
 func (rpr *RetryablePipelineRun) PinPipelineRun(pr *pipelinev1beta1.PipelineRun) bool {
 	if pr.Status.PipelineSpec == nil {
 		return false
@@ -117,6 +119,8 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 	}
 }
 
+// ResolvedResultRefs converts completed TaskRun results to the list of pipelinerun.ResolvedResultRef
+// in order to utilize it for variable substitution.
 func (s *RetryablePipelineRunStatus) ResolvedResultRefs() pipelinerun.ResolvedResultRefs {
 	var refs pipelinerun.ResolvedResultRefs
 	for ptname, results := range s.TaskResults {
@@ -178,14 +182,17 @@ type PartialPipelineRunStatus struct {
 	TaskRuns map[string]*pipelinev1beta1.PipelineRunTaskRunStatus `json:"taskRuns,omitempty"`
 }
 
+// IsRetryKeyChanged returns true when a retry-key annotation is changed from the previous value.
 func (rpr *RetryablePipelineRun) IsRetryKeyChanged() bool {
 	return RetryKey(&rpr.ObjectMeta) != rpr.Status.RetryKey
 }
 
+// CopyRetryKey copies a retry-key annotation to status.retryKey field.
 func (rpr *RetryablePipelineRun) CopyRetryKey() {
 	rpr.Status.RetryKey = RetryKey(&rpr.ObjectMeta)
 }
 
+// CopyFrom copies the status of given PipelineRun to the list of PipelineRun statuses inside RetryablePipelineRun status.
 func (s *PartialPipelineRunStatus) CopyFrom(pr *pipelinev1beta1.PipelineRunStatus) {
 	s.StartTime = pr.StartTime
 	s.CompletionTime = pr.CompletionTime
@@ -195,6 +202,7 @@ func (s *PartialPipelineRunStatus) CopyFrom(pr *pipelinev1beta1.PipelineRunStatu
 	s.PipelineResults = pr.PipelineResults
 }
 
+// PipelineRunStatus returns the latest status of given PipelineRun from the copies inside RetryablePipelineRun status.
 func (rpr *RetryablePipelineRun) PipelineRunStatus(name string) *PartialPipelineRunStatus {
 	for _, pr := range rpr.Status.PipelineRuns {
 		if pr.Name == name {
