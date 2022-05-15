@@ -17,12 +17,18 @@
 package v1alpha1
 
 import (
+	"errors"
 	"github.com/hrk091/retryable-pipeline/pkg/pipelinerun"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/names"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/apis"
 	duckv1beta1 "knative.dev/pkg/apis/duck/v1beta1"
+)
+
+var (
+	ErrInvalidPinnedSpec = errors.New("assertion error: pinned PipelineSpec is invalid")
 )
 
 // RetryablePipelineRunStatus defines the observed state of RetryablePipelineRun.
@@ -68,9 +74,10 @@ func (rpr *RetryablePipelineRun) InitializeStatus() {
 	}
 }
 
-// PinPipelineRun copies resolved PipelineSpec and metadata to RetryablePipelineRunStatus.PinnedPipelineRun
+// PinPipelineSpecFrom copies resolved PipelineSpec and metadata to RetryablePipelineRunStatus.PinnedPipelineRun
 // to pin spec and metadata of the first PipelineRun and enable to reuse them for building retry PipelineRun.
-func (rpr *RetryablePipelineRun) PinPipelineRun(pr *pipelinev1beta1.PipelineRun) bool {
+// It returns false when PipelineSpec is not resolved yet and it is unable to copy it.
+func (rpr *RetryablePipelineRun) PinPipelineSpecFrom(pr *pipelinev1beta1.PipelineRun) bool {
 	if pr.Status.PipelineSpec == nil {
 		return false
 	}
@@ -89,6 +96,59 @@ func (rpr *RetryablePipelineRun) PinPipelineRun(pr *pipelinev1beta1.PipelineRun)
 
 	rpr.Status.PinnedPipelineRun = ppr
 	return true
+}
+
+// PinTaskSpecFrom copies resolved TaskSpec to RetryablePipelineRunStatus.PinnedPipelineRun
+// to pin TaskSpec of the first TaskRun and enable to reuse them for building retry PipelineRun.
+// It returns false when TaskSpec is not resolved yet and it is unable to copy it.
+func (rpr *RetryablePipelineRun) PinTaskSpecFrom(pr *pipelinev1beta1.PipelineRun, pipelineTaskName string) (bool, error) {
+	if rpr.Status.PinnedPipelineRun.Status.PipelineSpec == nil {
+		return false, ErrInvalidPinnedSpec
+	}
+
+	var taskSpec *pipelinev1beta1.EmbeddedTask
+	for _, tr := range pr.Status.TaskRuns {
+		if tr.PipelineTaskName != pipelineTaskName {
+			continue
+		}
+		if tr.Status == nil {
+			continue
+		}
+		taskSpec = &pipelinev1beta1.EmbeddedTask{
+			Spec:     runtime.RawExtension{Raw: []byte("{}")},
+			TaskSpec: *tr.Status.TaskSpec,
+		}
+	}
+	if taskSpec == nil {
+		return false, nil
+	}
+
+	for i, t := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
+		if t.Name != pipelineTaskName {
+			continue
+		}
+		t.TaskSpec = taskSpec
+		t.TaskRef = nil
+		rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks[i] = t
+		return true, nil
+	}
+
+	return false, ErrInvalidPinnedSpec
+}
+
+// IsTaskSpecPinned returns true when the TaskSpec of given PipelineTask is already pinned.
+func (rpr *RetryablePipelineRun) IsTaskSpecPinned(pipelineTaskName string) (bool, error) {
+	if rpr.Status.PinnedPipelineRun.Status.PipelineSpec == nil {
+		return false, ErrInvalidPinnedSpec
+	}
+
+	for _, t := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
+		if t.Name != pipelineTaskName {
+			continue
+		}
+		return t.TaskSpec != nil, nil
+	}
+	return false, ErrInvalidPinnedSpec
 }
 
 // AggregateChildrenResults aggregates belonging PipelineRun/TaskRun statuses
