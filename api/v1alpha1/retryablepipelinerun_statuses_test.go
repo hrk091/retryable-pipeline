@@ -27,6 +27,47 @@ import (
 	"time"
 )
 
+func TestRetryablePipelineRun_PinPipelineSpecFrom(t *testing.T) {
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+	ok := rpr.PinPipelineSpecFrom(pr)
+	assert.True(t, ok)
+	assert.Equal(t, rpr.Status.PinnedPipelineRun.ObjectMeta.Namespace, pr.ObjectMeta.Namespace)
+	assert.Equal(t, rpr.Status.PinnedPipelineRun.ObjectMeta.Labels, pr.ObjectMeta.Labels)
+	assert.Equal(t, rpr.Status.PinnedPipelineRun.ObjectMeta.Annotations["kubectl.kubernetes.io/last-applied-configuration"], "")
+	assert.Equal(t, rpr.Status.PinnedPipelineRun.Status.PipelineSpec, pr.Status.PipelineSpec)
+}
+
+func TestRetryablePipelineRun_PinTaskSpecFrom(t *testing.T) {
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+	rpr.PinPipelineSpecFrom(pr)
+
+	var (
+		ok  bool
+		err error
+	)
+	ok, err = rpr.PinTaskSpecFrom(pr, "task1")
+	assert.Nil(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks[0].Name, "task1")
+	assert.NotNil(t, rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks[0].TaskSpec)
+}
+
+func TestRetryablePipelineRun_PinTaskSpecFrom_nonExistingTask(t *testing.T) {
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+	rpr.PinPipelineSpecFrom(pr)
+
+	var (
+		ok  bool
+		err error
+	)
+	ok, err = rpr.PinTaskSpecFrom(pr, "notExist")
+	assert.Nil(t, err)
+	assert.False(t, ok)
+}
+
 func TestRetryablePipelineRun_AggregateChildrenResults(t *testing.T) {
 	o := internal.DecodeRPR([]byte(`
 apiVersion: tekton.hrk091.dev/v1alpha1
