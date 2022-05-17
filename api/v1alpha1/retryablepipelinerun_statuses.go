@@ -111,7 +111,7 @@ func (rpr *RetryablePipelineRun) PinTaskSpecFrom(pr *pipelinev1beta1.PipelineRun
 		if tr.PipelineTaskName != pipelineTaskName {
 			continue
 		}
-		if tr.Status == nil {
+		if tr.Status == nil || tr.Status.TaskSpec == nil {
 			continue
 		}
 		taskSpec = &pipelinev1beta1.EmbeddedTask{
