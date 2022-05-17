@@ -125,6 +125,7 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		s.CopyFrom(&pr.Status)
 	}
 	rpr.AggregateChildrenResults()
+	rpr.UpdateCondition()
 
 	if err := r.Status().Update(ctx, &rpr); err != nil {
 		l.Error(err, "unable to update RetryablePipelineRun Status")

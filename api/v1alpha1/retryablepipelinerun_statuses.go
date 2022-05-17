@@ -174,10 +174,22 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 
 	lastPr := rpr.Status.PipelineRuns[len(rpr.Status.PipelineRuns)-1]
 	lastCond := lastPr.GetCondition()
-	// TODO create original condition instead of copying
-	rpr.Status.SetCondition(lastCond.DeepCopy())
 	if lastCond.IsTrue() {
 		rpr.Status.PipelineResults = lastPr.PipelineResults
+	}
+}
+
+func (rpr *RetryablePipelineRun) UpdateCondition() {
+	s := NewReducedPipelineRunCondition(rpr.Status).Stats()
+	switch {
+	case s.IsRunning():
+		rpr.Status.MarkRunning(pipelinev1beta1.PipelineRunReasonRunning.String(), s.Info())
+	case s.IsFailed():
+		rpr.Status.MarkFailed(pipelinev1beta1.PipelineRunReasonFailed.String(), s.Info())
+	case s.IsCancelled():
+		rpr.Status.MarkFailed(pipelinev1beta1.PipelineRunReasonCancelled.String(), s.Info())
+	case s.IsSucceeded():
+		rpr.Status.MarkSucceeded(pipelinev1beta1.PipelineRunReasonSuccessful.String(), s.Info())
 	}
 }
 
