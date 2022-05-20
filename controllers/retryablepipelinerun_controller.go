@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,6 +85,16 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		}
 	}
 
+	if pr := r.makeNextPipelineRunIfReady(&rpr); pr != nil {
+		l.Info("creating new PipelineRun", "PipelineRun", pr)
+		if err := r.createPipelineRun(ctx, pr, &rpr); apierrors.IsAlreadyExists(err) {
+			l.Info("PipelineRun is already created", "name", pr.Name)
+		} else if err != nil {
+			l.Error(err, "unable to create PipelineRun")
+			return ctrl.Result{}, err
+		}
+	}
+
 	l.Info("listing PipelineRun")
 	var prs pipelinev1beta1.PipelineRunList
 	if err := r.List(ctx, &prs, &client.ListOptions{
@@ -95,14 +106,17 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	l.Info("check PipelineSpec is pinned")
-	if rpr.Status.PinnedPipelineRun == nil && len(prs.Items) > 0 {
+	if rpr.Status.PinnedPipelineRun == nil {
 		l.Info("pin PipelineSpec")
-		rpr.PinPipelineSpecFrom(&prs.Items[0])
-		l.Info("pinned first PipelineRun")
-	}
-
-	if rpr.Status.PinnedPipelineRun != nil {
-		l.Info("check TaskSpec is pinned")
+		if len(prs.Items) == 0 {
+			l.Info("PipelineRun is not created yet")
+			return ctrl.Result{}, nil
+		}
+		if ok := rpr.PinPipelineSpecFrom(&prs.Items[0]); !ok {
+			l.Info("unable to pin first PipelineRun")
+			return ctrl.Result{}, nil
+		}
+		l.Info("pin TaskSpecs")
 		for _, pt := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
 			if ok, err := rpr.IsTaskSpecPinned(pt.Name); err != nil {
 				l.Error(err, "PipelineTask", pt.Name)
@@ -133,15 +147,6 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 	l.Info("updated RetryablePipelineRun status")
 
-	if pr := r.makeNextPipelineRunIfRequested(&rpr); pr != nil {
-		l.Info("creating new PipelineRun", "PipelineRun", pr)
-		if err := r.createPipelineRun(ctx, pr, &rpr); err != nil {
-			l.Error(err, "unable to create PipelineRun")
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
-		l.Info("created new pipeline")
-	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -153,16 +158,18 @@ func (r *RetryablePipelineRunReconciler) SetupWithManager(mgr ctrl.Manager) erro
 		Complete(r)
 }
 
-func (r *RetryablePipelineRunReconciler) makeNextPipelineRunIfRequested(rpr *rprv1alpha1.RetryablePipelineRun) *pipelinev1beta1.PipelineRun {
+func (r *RetryablePipelineRunReconciler) makeNextPipelineRunIfReady(rpr *rprv1alpha1.RetryablePipelineRun) *pipelinev1beta1.PipelineRun {
 	name := rpr.NextPipelineRunName()
 	if name == "" {
 		return nil
 	}
 	if rpr.StartedPipelineRunCount() == 0 {
 		return rpr.NewPipelineRun(name)
-	} else {
-		return rpr.NewRetryPipelineRun(name)
 	}
+	if !rpr.Status.HasDone() {
+		return nil
+	}
+	return rpr.NewRetryPipelineRun(name)
 }
 
 func (r *RetryablePipelineRunReconciler) createPipelineRun(ctx context.Context, pr *pipelinev1beta1.PipelineRun, rpr *rprv1alpha1.RetryablePipelineRun) error {
