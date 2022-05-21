@@ -18,6 +18,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/hrk091/retryable-pipeline/api/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
@@ -25,6 +26,18 @@ import (
 	"path"
 	"runtime"
 )
+
+func NewRetryablePipelineRunTestData(name string) *v1alpha1.RetryablePipelineRun {
+	buf, err := ioutil.ReadFile(fmt.Sprintf("%s/testdata/%s.yaml", pkgDir(), name))
+	if err != nil {
+		panic(err)
+	}
+	var o v1alpha1.RetryablePipelineRun
+	if err := yaml.Unmarshal(buf, &o); err != nil {
+		panic(err)
+	}
+	return &o
+}
 
 func NewPipelineTestData(name string) *v1beta1.Pipeline {
 	buf, err := ioutil.ReadFile(fmt.Sprintf("%s/testdata/%s.yaml", pkgDir(), name))

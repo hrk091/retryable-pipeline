@@ -1,7 +1,9 @@
 apiVersion: tekton.hrk091.dev/v1alpha1
 kind: RetryablePipelineRun
 metadata:
-  name: sample-dh5hp
+  annotations:
+    tekton.hrk091.dev/retry-key: abcde
+  name: sample-rwcff
 spec:
   params:
     - name: msg
@@ -9,45 +11,118 @@ spec:
   pipelineRef:
     name: sample
 status:
+  RetryKey: abcde
+  completionTime: "2022-05-21T14:44:31Z"
   conditions:
-    - lastTransitionTime: "2022-05-06T13:38:06Z"
-      reason: Started
-      status: Unknown
+    - lastTransitionTime: "2022-05-21T14:44:31Z"
+      message: 'Tasks Completed: 2 (Failed: 0, Cancelled 0), Skipped: 0'
+      reason: Succeeded
+      status: "True"
       type: Succeeded
+  pinnedPipelineRun:
+    apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      creationTimestamp: null
+      labels:
+        tekton.dev/pipeline: sample
+        tekton.hrk091.dev/retryablePipelineRun: sample-rwcff
+    spec:
+      params:
+        - name: msg
+          value: aaa
+      pipelineRef:
+        name: sample
+      serviceAccountName: default
+      timeout: 1h0m0s
+    status:
+      pipelineSpec:
+        params:
+          - name: msg
+            type: string
+        results:
+          - description: test result
+            name: out
+            value: $(tasks.task2.results.out)
+        tasks:
+          - name: task1
+            taskSpec:
+              metadata: {}
+              params:
+                - default: Hello world!
+                  name: msg
+                  type: string
+              results:
+                - description: test result
+                  name: out
+              spec: {}
+              steps:
+                - image: bash:latest
+                  name: step1
+                  resources: {}
+                  script: |
+                    #!/usr/bin/env bash
+                    echo -n '$(params.msg)' | tee $(results.out.path)
+          - name: task2
+            params:
+              - name: msg
+                value: $(params.msg)
+            runAfter:
+              - task1
+            taskSpec:
+              metadata: {}
+              params:
+                - default: Hello world!
+                  name: msg
+                  type: string
+              results:
+                - description: test result
+                  name: out
+              spec: {}
+              steps:
+                - image: bash:latest
+                  name: step1
+                  resources: {}
+                  script: |
+                    #!/usr/bin/env bash
+                    echo -n '$(params.msg)' | tee $(results.out.path)
+  pipelineResults:
+    - name: out
+      value: aaa
   pipelineRuns:
-    - completionTime: "2022-05-06T13:38:29Z"
+    - completionTime: "2022-05-21T14:43:41Z"
       conditions:
-        - lastTransitionTime: "2022-05-06T13:38:29Z"
-          message: 'Tasks Completed: 2 (Failed: 0, Cancelled 0), Skipped: 0'
-          reason: Succeeded
-          status: "True"
+        - lastTransitionTime: "2022-05-21T14:43:41Z"
+          message: 'Tasks Completed: 2 (Failed: 1, Cancelled 0), Skipped: 0'
+          reason: Failed
+          status: "False"
           type: Succeeded
-      name: sample-dh5hp-d5v22
-      startTime: "2022-05-06T13:38:06Z"
+      name: sample-rwcff-ssrb5
+      startTime: "2022-05-21T14:43:28Z"
       taskRuns:
-        sample-dh5hp-d5v22-task1:
+        sample-rwcff-ssrb5-task1:
           pipelineTaskName: task1
           status:
-            completionTime: "2022-05-06T13:38:22Z"
+            completionTime: "2022-05-21T14:43:35Z"
             conditions:
-              - lastTransitionTime: "2022-05-06T13:38:22Z"
+              - lastTransitionTime: "2022-05-21T14:43:35Z"
                 message: All Steps have completed executing
                 reason: Succeeded
                 status: "True"
                 type: Succeeded
-            podName: sample-dh5hp-d5v22-task1-pod
-            startTime: "2022-05-06T13:38:06Z"
+            podName: sample-rwcff-ssrb5-task1-pod
+            startTime: "2022-05-21T14:43:28Z"
             steps:
               - container: step-step1
-                imageID: docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5
+                imageID: docker.io/library/bash@sha256:...
                 name: step1
                 terminated:
-                  containerID: containerd://3031a21a67ad1f666f9133288cc779a359b06b6659bfd2b62c5fc0b935971418
+                  containerID: containerd://...
                   exitCode: 0
-                  finishedAt: "2022-05-06T13:38:22Z"
+                  finishedAt: "2022-05-21T14:43:34Z"
                   message: '[{"key":"out","value":"Hello world!","type":1}]'
                   reason: Completed
-                  startedAt: "2022-05-06T13:38:22Z"
+                  startedAt: "2022-05-21T14:43:34Z"
             taskResults:
               - name: out
                 value: Hello world!
@@ -66,29 +141,88 @@ status:
                   script: |
                     #!/usr/bin/env bash
                     echo -n '$(params.msg)' | tee $(results.out.path)
-        sample-dh5hp-d5v22-task2:
+        sample-rwcff-ssrb5-task2:
           pipelineTaskName: task2
           status:
-            completionTime: "2022-05-06T13:38:29Z"
+            completionTime: "2022-05-21T14:43:41Z"
             conditions:
-              - lastTransitionTime: "2022-05-06T13:38:29Z"
+              - lastTransitionTime: "2022-05-21T14:43:41Z"
+                message: |
+                  "step-step1" exited with code 1
+                reason: Failed
+                status: "False"
+                type: Succeeded
+            podName: sample-rwcff-ssrb5-task2-pod
+            startTime: "2022-05-21T14:43:35Z"
+            steps:
+              - container: step-step1
+                imageID: docker.io/library/bash@sha256:...
+                name: step1
+                terminated:
+                  containerID: containerd://...
+                  exitCode: 1
+                  finishedAt: "2022-05-21T14:43:41Z"
+                  message: '[{"key":"out","value":"aaa","type":1}]'
+                  reason: Error
+                  startedAt: "2022-05-21T14:43:41Z"
+            taskSpec:
+              params:
+                - default: Hello world!
+                  name: msg
+                  type: string
+              results:
+                - description: test result
+                  name: out
+              steps:
+                - image: bash:latest
+                  name: step1
+                  resources: {}
+                  script: |
+                    #!/usr/bin/env bash
+                    echo -n '$(params.msg)' | tee $(results.out.path)
+    - completionTime: "2022-05-21T14:44:31Z"
+      conditions:
+        - lastTransitionTime: "2022-05-21T14:44:31Z"
+          message: 'Tasks Completed: 1 (Failed: 0, Cancelled 0), Skipped: 1'
+          reason: Completed
+          status: "True"
+          type: Succeeded
+      name: sample-rwcff-dltzx
+      pipelineResults:
+        - name: out
+          value: aaa
+      skippedTasks:
+        - name: task1
+          whenExpressions:
+            - input: skipped
+              operator: in
+              values:
+                - ""
+      startTime: "2022-05-21T14:44:25Z"
+      taskRuns:
+        sample-rwcff-dltzx-task2:
+          pipelineTaskName: task2
+          status:
+            completionTime: "2022-05-21T14:44:31Z"
+            conditions:
+              - lastTransitionTime: "2022-05-21T14:44:31Z"
                 message: All Steps have completed executing
                 reason: Succeeded
                 status: "True"
                 type: Succeeded
-            podName: sample-dh5hp-d5v22-task2-pod
-            startTime: "2022-05-06T13:38:22Z"
+            podName: sample-rwcff-dltzx-task2-pod
+            startTime: "2022-05-21T14:44:25Z"
             steps:
               - container: step-step1
-                imageID: docker.io/library/bash@sha256:b3abe4255706618c550e8db5ec0875328333a14dbf663e6f1e2b6875f45521e5
+                imageID: docker.io/library/bash@sha256:...
                 name: step1
                 terminated:
-                  containerID: containerd://de4f316bc8fa8b7044bd7cb206bfc960474fb3ca8812555e92037b521b791d5e
+                  containerID: containerd://...
                   exitCode: 0
-                  finishedAt: "2022-05-06T13:38:29Z"
+                  finishedAt: "2022-05-21T14:44:31Z"
                   message: '[{"key":"out","value":"aaa","type":1}]'
                   reason: Completed
-                  startedAt: "2022-05-06T13:38:29Z"
+                  startedAt: "2022-05-21T14:44:30Z"
             taskResults:
               - name: out
                 value: aaa
@@ -107,4 +241,17 @@ status:
                   script: |
                     #!/usr/bin/env bash
                     echo -n '$(params.msg)' | tee $(results.out.path)
-  startTime: "2022-05-06T13:38:06Z"
+  startTime: "2022-05-21T14:43:28Z"
+  taskResults:
+    task1:
+      fromPipelineRun: sample-rwcff-ssrb5
+      fromTaskRun: sample-rwcff-ssrb5-task1
+      results:
+        - name: out
+          value: Hello world!
+    task2:
+      fromPipelineRun: sample-rwcff-dltzx
+      fromTaskRun: sample-rwcff-dltzx-task2
+      results:
+        - name: out
+          value: aaa
