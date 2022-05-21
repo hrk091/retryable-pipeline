@@ -116,16 +116,16 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 			l.Info("unable to pin first PipelineRun")
 			return ctrl.Result{}, nil
 		}
-		l.Info("pin TaskSpecs")
-		for _, pt := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
-			if ok, err := rpr.IsTaskSpecPinned(pt.Name); err != nil {
-				l.Error(err, "PipelineTask", pt.Name)
-			} else if !ok {
-				l.Info("pin TaskSpec from the newest PipelineRun", "PipelineTask", pt.Name)
-				_, _ = rpr.PinTaskSpecFrom(&prs.Items[len(prs.Items)-1], pt.Name)
-			} else {
-				l.Info("TaskSpec has already been pinned", "PipelineTask", pt.Name)
-			}
+	}
+	l.Info("pin TaskSpecs")
+	for _, pt := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
+		if ok, err := rpr.IsTaskSpecPinned(pt.Name); err != nil {
+			l.Error(err, "PipelineTask", pt.Name)
+		} else if !ok {
+			l.Info("pin TaskSpec from the newest PipelineRun", "PipelineTask", pt.Name)
+			_, _ = rpr.PinTaskSpecFrom(&prs.Items[len(prs.Items)-1], pt.Name)
+		} else {
+			l.Info("TaskSpec has already been pinned", "PipelineTask", pt.Name)
 		}
 	}
 
