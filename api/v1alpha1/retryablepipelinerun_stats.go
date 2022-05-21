@@ -28,20 +28,22 @@ type ReducedPipelineRunCondition struct {
 
 type ReducedTaskRunCondition struct {
 	Condition *apis.Condition
-	Pending   bool
+	Started   bool
 	Skipped   bool
 }
 
-func NewReducedPipelineRunCondition(rpr *RetryablePipelineRunStatus) *ReducedPipelineRunCondition {
+func NewReducedPipelineRunCondition(rpr *RetryablePipelineRun) *ReducedPipelineRunCondition {
 	c := &ReducedPipelineRunCondition{
 		Tasks: map[string]ReducedTaskRunCondition{},
 	}
-	for _, pt := range rpr.PinnedPipelineRun.Status.PipelineSpec.Tasks {
-		c.Tasks[pt.Name] = ReducedTaskRunCondition{
-			Pending: true,
-		}
+	ns, err := rpr.PipelineTaskNames()
+	if err != nil {
+		return nil
 	}
-	for _, prs := range rpr.PipelineRuns {
+	for _, n := range ns {
+		c.Tasks[n] = ReducedTaskRunCondition{}
+	}
+	for _, prs := range rpr.Status.PipelineRuns {
 		c.collectCondition(prs)
 	}
 	return c
@@ -49,10 +51,9 @@ func NewReducedPipelineRunCondition(rpr *RetryablePipelineRunStatus) *ReducedPip
 
 func (c *ReducedPipelineRunCondition) collectCondition(prs *PartialPipelineRunStatus) {
 	for _, st := range prs.SkippedTasks {
-		if pt, ok := c.Tasks[st.Name]; ok && pt.Pending {
+		if pt, ok := c.Tasks[st.Name]; ok && !pt.Started {
 			c.Tasks[st.Name] = ReducedTaskRunCondition{
 				Condition: nil,
-				Pending:   false,
 				Skipped:   true,
 			}
 		}
@@ -61,26 +62,24 @@ func (c *ReducedPipelineRunCondition) collectCondition(prs *PartialPipelineRunSt
 	for _, tr := range prs.TaskRuns {
 		c.Tasks[tr.PipelineTaskName] = ReducedTaskRunCondition{
 			Condition: tr.Status.GetCondition(apis.ConditionSucceeded),
-			Pending:   false,
-			Skipped:   false,
+			Started:   true,
 		}
 	}
 }
 
-func (c *ReducedPipelineRunCondition) Stats() TaskRunStatusCount {
-	s := TaskRunStatusCount{
-		Skipped:    0,
-		Incomplete: 0,
-		Succeeded:  0,
-		Failed:     0,
-		Cancelled:  0,
+func (c *ReducedPipelineRunCondition) Stats() *TaskRunStatusCount {
+	if c == nil {
+		return nil
 	}
-	// TODO count any other not started tasks into incomplete tasks
+	s := &TaskRunStatusCount{}
 	for _, t := range c.Tasks {
+		s.All++
 		cond := t.Condition
 		switch {
 		case t.Skipped:
 			s.Skipped++
+		case !t.Started:
+			s.NotStarted++
 		case cond.IsTrue():
 			s.Succeeded++
 		case cond.IsFalse() && cond.Reason == pipelinev1beta1.TaskRunReasonCancelled.String():
@@ -95,29 +94,46 @@ func (c *ReducedPipelineRunCondition) Stats() TaskRunStatusCount {
 }
 
 type TaskRunStatusCount struct {
+	All        int
 	Skipped    int
+	NotStarted int
 	Incomplete int
 	Succeeded  int
 	Failed     int
 	Cancelled  int
 }
 
-func (c TaskRunStatusCount) Info() string {
+func (c *TaskRunStatusCount) Info() string {
+	if c == nil {
+		return "Not initialized yet"
+	}
 	return fmt.Sprintf("Tasks Completed: %d (Failed: %d, Cancelled %d), Skipped: %d", c.Succeeded, c.Failed, c.Cancelled, c.Skipped)
 }
 
-func (c TaskRunStatusCount) IsRunning() bool {
-	return c.Incomplete > 0
+func (c *TaskRunStatusCount) IsRunning() bool {
+	if c == nil {
+		return false
+	}
+	return c.NotStarted > 0 || c.Incomplete > 0
 }
 
-func (c TaskRunStatusCount) IsFailed() bool {
+func (c *TaskRunStatusCount) IsFailed() bool {
+	if c == nil {
+		return false
+	}
 	return !c.IsRunning() && c.Failed > 0
 }
 
-func (c TaskRunStatusCount) IsCancelled() bool {
+func (c *TaskRunStatusCount) IsCancelled() bool {
+	if c == nil {
+		return false
+	}
 	return !c.IsRunning() && c.Cancelled > 0
 }
 
-func (c TaskRunStatusCount) IsSucceeded() bool {
+func (c *TaskRunStatusCount) IsSucceeded() bool {
+	if c == nil {
+		return false
+	}
 	return !c.IsRunning() && c.Failed == 0 && c.Cancelled == 0
 }

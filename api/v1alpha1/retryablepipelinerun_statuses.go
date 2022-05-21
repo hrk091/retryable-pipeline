@@ -98,11 +98,31 @@ func (rpr *RetryablePipelineRun) PinPipelineSpecFrom(pr *pipelinev1beta1.Pipelin
 	return true
 }
 
+// IsPipelineSpecPinned returns true when the PipelineSpec is already pinned.
+func (rpr *RetryablePipelineRun) IsPipelineSpecPinned() bool {
+	if rpr.Status.PinnedPipelineRun == nil {
+		return false
+	}
+	return rpr.Status.PinnedPipelineRun.Status.PipelineSpec != nil
+}
+
+// PipelineTaskNames returns a PipelineTask name list defined at Pinned PipelineSpec.
+func (rpr *RetryablePipelineRun) PipelineTaskNames() ([]string, error) {
+	var ns []string
+	if !rpr.IsPipelineSpecPinned() {
+		return ns, ErrInvalidPinnedSpec
+	}
+	for _, pt := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
+		ns = append(ns, pt.Name)
+	}
+	return ns, nil
+}
+
 // PinTaskSpecFrom copies resolved TaskSpec to RetryablePipelineRunStatus.PinnedPipelineRun
 // to pin TaskSpec of the first TaskRun and enable to reuse them for building retry PipelineRun.
 // It returns false when TaskSpec is not resolved yet and it is unable to copy it.
 func (rpr *RetryablePipelineRun) PinTaskSpecFrom(pr *pipelinev1beta1.PipelineRun, pipelineTaskName string) (bool, error) {
-	if rpr.Status.PinnedPipelineRun.Status.PipelineSpec == nil {
+	if !rpr.IsPipelineSpecPinned() {
 		return false, ErrInvalidPinnedSpec
 	}
 
@@ -179,8 +199,9 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 	}
 }
 
+// UpdateCondition calculates current condition and sets it into its status.
 func (rpr *RetryablePipelineRun) UpdateCondition() {
-	s := NewReducedPipelineRunCondition(rpr.Status).Stats()
+	s := NewReducedPipelineRunCondition(rpr).Stats()
 	switch {
 	case s.IsRunning():
 		rpr.Status.MarkRunning(pipelinev1beta1.PipelineRunReasonRunning.String(), s.Info())

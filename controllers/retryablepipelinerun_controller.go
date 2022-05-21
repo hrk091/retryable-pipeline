@@ -106,7 +106,7 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	l.Info("check PipelineSpec is pinned")
-	if rpr.Status.PinnedPipelineRun == nil {
+	if !rpr.IsPipelineSpecPinned() {
 		l.Info("pin PipelineSpec")
 		if len(prs.Items) == 0 {
 			l.Info("PipelineRun is not created yet")
