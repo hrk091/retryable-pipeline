@@ -38,6 +38,15 @@ func TestRetryablePipelineRun_PinPipelineSpecFrom(t *testing.T) {
 	assert.Equal(t, rpr.Status.PinnedPipelineRun.Status.PipelineSpec, pr.Status.PipelineSpec)
 }
 
+func TestRetryablePipelineRun_IsPipelineSpecPinned(t *testing.T) {
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+	assert.False(t, rpr.IsPipelineSpecPinned())
+
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr.PinPipelineSpecFrom(pr)
+	assert.True(t, rpr.IsPipelineSpecPinned())
+}
+
 func TestRetryablePipelineRun_PinTaskSpecFrom(t *testing.T) {
 	pr := internal.NewPipelineRunTestData("sample.pr")
 	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
@@ -54,6 +63,23 @@ func TestRetryablePipelineRun_PinTaskSpecFrom(t *testing.T) {
 	assert.NotNil(t, rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks[0].TaskSpec)
 }
 
+func TestRetryablePipelineRun_PipelineTaskNames(t *testing.T) {
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+
+	var (
+		ns  []string
+		err error
+	)
+	ns, err = rpr.PipelineTaskNames()
+	assert.NotNil(t, err)
+
+	rpr.PinPipelineSpecFrom(pr)
+	ns, err = rpr.PipelineTaskNames()
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"task1", "task2"}, ns)
+}
+
 func TestRetryablePipelineRun_PinTaskSpecFrom_nonExistingTask(t *testing.T) {
 	pr := internal.NewPipelineRunTestData("sample.pr")
 	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
@@ -66,6 +92,29 @@ func TestRetryablePipelineRun_PinTaskSpecFrom_nonExistingTask(t *testing.T) {
 	ok, err = rpr.PinTaskSpecFrom(pr, "notExist")
 	assert.Nil(t, err)
 	assert.False(t, ok)
+}
+
+func TestRetryablePipelineRun_IsTaskSpecPinned(t *testing.T) {
+	pr := internal.NewPipelineRunTestData("sample.pr")
+	rpr := NewRetryablePipelineRun("test", PipelineRef("sample"), InitStatus())
+
+	var (
+		ok  bool
+		err error
+	)
+	ok, err = rpr.IsTaskSpecPinned("task1")
+	assert.False(t, ok)
+	assert.NotNil(t, err)
+
+	rpr.PinPipelineSpecFrom(pr)
+	ok, err = rpr.IsTaskSpecPinned("task1")
+	assert.False(t, ok)
+	assert.Nil(t, err)
+
+	rpr.PinTaskSpecFrom(pr, "task1")
+	ok, err = rpr.IsTaskSpecPinned("task1")
+	assert.True(t, ok)
+	assert.Nil(t, err)
 }
 
 func TestRetryablePipelineRun_AggregateChildrenResults(t *testing.T) {

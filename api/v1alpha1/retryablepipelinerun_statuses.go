@@ -158,7 +158,7 @@ func (rpr *RetryablePipelineRun) PinTaskSpecFrom(pr *pipelinev1beta1.PipelineRun
 
 // IsTaskSpecPinned returns true when the TaskSpec of given PipelineTask is already pinned.
 func (rpr *RetryablePipelineRun) IsTaskSpecPinned(pipelineTaskName string) (bool, error) {
-	if rpr.Status.PinnedPipelineRun.Status.PipelineSpec == nil {
+	if !rpr.IsPipelineSpecPinned() {
 		return false, ErrInvalidPinnedSpec
 	}
 
