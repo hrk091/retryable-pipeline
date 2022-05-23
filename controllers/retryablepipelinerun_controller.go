@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 type RetryablePipelineRunReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	EventEmitter
 }
 
 //+kubebuilder:rbac:groups=tekton.hrk091.dev,resources=retryablepipelineruns,verbs=get;list;watch;create;update;patch;delete
@@ -45,7 +47,7 @@ type RetryablePipelineRunReconciler struct {
 // move the current state of the cluster closer to the desired state.
 func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
-	l.Info("start reconciliation")
+	l.Info("reconciliation started")
 
 	var rpr rprv1alpha1.RetryablePipelineRun
 	if err := r.Get(ctx, req.NamespacedName, &rpr); err != nil {
@@ -64,6 +66,7 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		rpr.ReserveNextPipelineRunName()
 		if err := r.Status().Update(ctx, &rpr); err != nil {
 			l.Error(err, "unable to update RetryablePipelineRun Status")
+			r.EmitError(&rpr, err)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 		l.Info("initialization completed. Requeueing...")
@@ -76,6 +79,7 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 			rpr.CopyRetryKey()
 			if err := r.Status().Update(ctx, &rpr); err != nil {
 				l.Error(err, "unable to update RetryablePipelineRun Status")
+				r.EmitError(&rpr, err)
 				return ctrl.Result{}, client.IgnoreNotFound(err)
 			}
 			l.Info("retry setup completed. Requeueing...")
@@ -87,25 +91,27 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 
 	if pr := r.makeNextPipelineRunIfReady(&rpr); pr != nil {
 		l.Info("creating new PipelineRun", "PipelineRun", pr)
-		if err := r.createPipelineRun(ctx, pr, &rpr); apierrors.IsAlreadyExists(err) {
+		if err := r.createPipelineRun(ctx, pr, &rpr); err == nil {
+			r.EmitInfo(&rpr, "PipelineRun Created", fmt.Sprintf("Name: %s", pr.Name))
+		} else if apierrors.IsAlreadyExists(err) {
 			l.Info("PipelineRun is already created", "name", pr.Name)
-		} else if err != nil {
+		} else {
 			l.Error(err, "unable to create PipelineRun")
+			r.EmitError(&rpr, err)
 			return ctrl.Result{}, err
 		}
 	}
 
-	l.Info("listing PipelineRun")
 	var prs pipelinev1beta1.PipelineRunList
 	if err := r.List(ctx, &prs, &client.ListOptions{
 		LabelSelector: rpr.ChildLabels().AsSelector(),
 		Namespace:     rpr.Namespace,
 	}); err != nil {
 		l.Error(err, "unable to list PipelineRun")
+		r.EmitError(&rpr, err)
 		return ctrl.Result{}, err
 	}
 
-	l.Info("check PipelineSpec is pinned")
 	if !rpr.IsPipelineSpecPinned() {
 		l.Info("pin PipelineSpec")
 		if len(prs.Items) == 0 {
@@ -113,23 +119,20 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 			return ctrl.Result{}, nil
 		}
 		if ok := rpr.PinPipelineSpecFrom(&prs.Items[0]); !ok {
-			l.Info("unable to pin first PipelineRun")
+			l.Info("PipelineSpec is not resolved yet")
 			return ctrl.Result{}, nil
 		}
 	}
-	l.Info("pin TaskSpecs")
 	for _, pt := range rpr.Status.PinnedPipelineRun.Status.PipelineSpec.Tasks {
 		if ok, err := rpr.IsTaskSpecPinned(pt.Name); err != nil {
-			l.Error(err, "PipelineTask", pt.Name)
+			l.Info("unable to pin TaskSpec since PipelineSpec is not resolved yet", "PipelineTask", pt.Name)
 		} else if !ok {
 			l.Info("pin TaskSpec from the newest PipelineRun", "PipelineTask", pt.Name)
 			_, _ = rpr.PinTaskSpecFrom(&prs.Items[len(prs.Items)-1], pt.Name)
-		} else {
-			l.Info("TaskSpec has already been pinned", "PipelineTask", pt.Name)
 		}
 	}
 
-	l.Info("update RetryablePipelineRun status")
+	oldStats := rprv1alpha1.NewReducedPipelineRunCondition(&rpr).Stats()
 	for _, pr := range prs.Items {
 		s := rpr.PipelineRunStatus(pr.Name)
 		if s == nil {
@@ -139,14 +142,19 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 		s.CopyFrom(&pr.Status)
 	}
 	rpr.AggregateChildrenResults()
-	rpr.UpdateCondition()
+
+	newStats := rpr.UpdateCondition()
+	if newStats.ChangedFrom(oldStats) {
+		r.EmitInfo(&rpr, rpr.Status.GetCondition().Reason, newStats.Info())
+	}
 
 	if err := r.Status().Update(ctx, &rpr); err != nil {
 		l.Error(err, "unable to update RetryablePipelineRun Status")
+		r.EmitError(&rpr, err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	l.Info("updated RetryablePipelineRun status")
 
+	l.Info("reconciliation ended")
 	return ctrl.Result{}, nil
 }
 

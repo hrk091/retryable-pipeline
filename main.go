@@ -83,6 +83,9 @@ func main() {
 	if err = (&controllers.RetryablePipelineRunReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		EventEmitter: controllers.EventEmitter{
+			Recorder: mgr.GetEventRecorderFor("RetryablePipelineRun"),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RetryablePipelineRun")
 		os.Exit(1)

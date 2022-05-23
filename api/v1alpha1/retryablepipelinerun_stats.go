@@ -137,3 +137,7 @@ func (c *TaskRunStatusCount) IsSucceeded() bool {
 	}
 	return !c.IsRunning() && c.Failed == 0 && c.Cancelled == 0
 }
+
+func (c *TaskRunStatusCount) ChangedFrom(prev *TaskRunStatusCount) bool {
+	return prev.Info() != c.Info()
+}

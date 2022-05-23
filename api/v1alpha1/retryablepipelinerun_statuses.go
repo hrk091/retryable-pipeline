@@ -200,7 +200,7 @@ func (rpr *RetryablePipelineRun) AggregateChildrenResults() {
 }
 
 // UpdateCondition calculates current condition and sets it into its status.
-func (rpr *RetryablePipelineRun) UpdateCondition() {
+func (rpr *RetryablePipelineRun) UpdateCondition() *TaskRunStatusCount {
 	s := NewReducedPipelineRunCondition(rpr).Stats()
 	switch {
 	case s.IsRunning():
@@ -212,6 +212,7 @@ func (rpr *RetryablePipelineRun) UpdateCondition() {
 	case s.IsSucceeded():
 		rpr.Status.MarkSucceeded(pipelinev1beta1.PipelineRunReasonSuccessful.String(), s.Info())
 	}
+	return s
 }
 
 // ResolvedResultRefs converts completed TaskRun results to the list of pipelinerun.ResolvedResultRef
