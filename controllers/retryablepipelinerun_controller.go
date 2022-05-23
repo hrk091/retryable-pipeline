@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	pipelinev1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -91,12 +90,7 @@ func (r *RetryablePipelineRunReconciler) Reconcile(ctx context.Context, req ctrl
 
 	if pr := r.makeNextPipelineRunIfReady(&rpr); pr != nil {
 		l.Info("creating new PipelineRun", "PipelineRun", pr)
-		if err := r.createPipelineRun(ctx, pr, &rpr); err == nil {
-			r.EmitInfo(&rpr, "PipelineRun Created", fmt.Sprintf("Name: %s", pr.Name))
-		} else if apierrors.IsAlreadyExists(err) {
-			l.Info("PipelineRun is already created", "name", pr.Name)
-		} else {
-			l.Error(err, "unable to create PipelineRun")
+		if err := r.createPipelineRun(ctx, pr, &rpr); err != nil {
 			r.EmitError(&rpr, err)
 			return ctrl.Result{}, err
 		}
@@ -182,6 +176,15 @@ func (r *RetryablePipelineRunReconciler) makeNextPipelineRunIfReady(rpr *rprv1al
 
 func (r *RetryablePipelineRunReconciler) createPipelineRun(ctx context.Context, pr *pipelinev1beta1.PipelineRun, rpr *rprv1alpha1.RetryablePipelineRun) error {
 	l := log.FromContext(ctx)
+
+	var o pipelinev1beta1.PipelineRun
+	if err := r.Get(ctx, client.ObjectKeyFromObject(pr), &o); err == nil {
+		l.Info("PipelineRun is already created", "name", pr.Name)
+		return nil
+	} else if client.IgnoreNotFound(err) != nil {
+		return err
+	}
+
 	if err := ctrl.SetControllerReference(rpr, pr, r.Scheme); err != nil {
 		l.Error(err, "unable to set controller reference to PipelineRun")
 		return err
@@ -190,6 +193,7 @@ func (r *RetryablePipelineRunReconciler) createPipelineRun(ctx context.Context, 
 		l.Error(err, "unable to create PipelineRun")
 		return err
 	}
-	l.Info("created a PipelineRun")
+	r.EmitInfo(rpr, "PipelineRun Created", fmt.Sprintf("Name: %s", pr.Name))
+
 	return nil
 }
